@@ -120,31 +120,52 @@ void ParameterManager::randomizeParameters()
 
         for (uint8_t step = 0; step < _tracks[i].stepCount; ++step)
         {
-            // For slide, we want a binary on/off state (0 or 1)
-            if (currentParamId == ParamId::Slide)
+            switch (currentParamId)
             {
-                std::uniform_int_distribution<int> slide_dist(0, 1);
-                _tracks[i].setValue(step, slide_dist(generator));
+            case ParamId::Slide: {
+                std::uniform_int_distribution<int> slide_dist(0, 12);
+                _tracks[i].setValue(step, (slide_dist(generator) == 0) ? 1.0f : 0.0f);
+                break;
             }
-            else
-            {
-                float randomValue = distribution(generator);
-                _tracks[i].setValue(step, randomValue);
-
-                // DEBUG: Trace randomization for Note parameter
-                /*
-                if (currentParamId == ParamId::Note && step < 4) {
-                    Serial.print("[RANDOM DEBUG] Note step ");
-                    Serial.print(step);
-                    Serial.print(": ");
-                    Serial.print(randomValue, 2);
-                    Serial.print(" (range: ");
-                    Serial.print(minVal, 2);
-                    Serial.print("-");
-                    Serial.print(maxVal, 2);
-                    Serial.println(")");
+            case ParamId::Gate: {
+                if ((step % 2) == 0) { // Even steps
+                    // 75% chance of being 1
+                    std::uniform_int_distribution<int> gate_dist(0, 3);
+                    _tracks[i].setValue(step, (gate_dist(generator) == 0) ? 0.0f : 1.0f);
+                } else { // Odd steps
+                    // 33% chance of being 1
+                    std::uniform_int_distribution<int> gate_dist(0, 2);
+                    _tracks[i].setValue(step, (gate_dist(generator) == 0) ? 1.0f : 0.0f);
                 }
-                */
+                break;
+            }
+            case ParamId::GateLength: { // Corrected from GateSize
+                std::uniform_real_distribution<float> dist(0.1f, 0.3f);
+                _tracks[i].setValue(step, dist(generator));
+                break;
+            }
+            case ParamId::Filter: {
+                std::uniform_real_distribution<float> dist(0.2f, 0.7f);
+                _tracks[i].setValue(step, dist(generator));
+                break;
+            }
+            case ParamId::Attack: {
+                std::uniform_real_distribution<float> dist(0.0f, 0.05f);
+                _tracks[i].setValue(step, dist(generator));
+                break;
+            }
+            case ParamId::Decay: {
+                std::uniform_real_distribution<float> dist(0.05f, 0.3f);
+                _tracks[i].setValue(step, dist(generator));
+                break;
+            }
+            case ParamId::Note:
+            case ParamId::Velocity:
+            case ParamId::Octave:
+            default: {
+                _tracks[i].setValue(step, distribution(generator));
+                break;
+            }
             }
         }
     }

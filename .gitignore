@@ -1,0 +1,22 @@
+# Build directory
+build/
+build/*
+PROGRAMMERS_MANUAL.md
+.vscode/
+*.swp
+*~
+.roo/*
+
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+src/audio/GEMINI.md
+src/LEDMatrix/LEDController_README.md
+src/sensors/GEMINI.md
+src/sequencer/GEMINI.md
+src/ui/GEMINI.md
+src/LEDMatrix/LEDController_README.md
+PROGRAMMERS_MANUAL.md
+GEMINI.md
+.roo/** 
+test_midi_implementation.cpp
