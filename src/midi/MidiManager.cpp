@@ -1,5 +1,6 @@
 #include "MidiManager.h"
-#include "../sequencer/Sequencer.h" // For Sequencer class definition
+#include "../scales/scales.h"  // ADD THIS LINE
+#include "../sequencer/Sequencer.h"
 #include "../sequencer/SequencerDefs.h" // For VoiceState and GateTimer definitions
 #include <algorithm> // For std::max, std::min, std::abs
 #include <cmath> // For mathematical functions
@@ -257,59 +258,12 @@ int getMidiNote(uint8_t finalNoteValue)
         finalNoteValue = 47;
     }
 
-    // DEBUG: Trace scale array lookup
-    /*
-    int scaleValue = scale[currentScale][finalNoteValue];
-    int midiNote = scaleValue + 36;
-    Serial.print("[SCALE DEBUG] finalNoteValue: ");
-    Serial.print(originalValue);
-    if (originalValue != finalNoteValue) {
-        Serial.print(" (clamped to ");
-        Serial.print(finalNoteValue);
-        Serial.print(")");
-    }
-    Serial.print(", scale[");
-    Serial.print(currentScale);
-    Serial.print("][");
-    Serial.print(finalNoteValue);
-    Serial.print("] = ");
-    Serial.print(scaleValue);
-    Serial.print(", MIDI note = ");
-    Serial.print(midiNote);
-    Serial.println();
-    */
+  
 
     // Base MIDI note C2 (36)
-    return scale[currentScale][finalNoteValue] + 36;
+    return scales[currentScale].notes[finalNoteValue] + 36;
 }
 
-// Legacy Voice 1 MIDI Callbacks (refactored to use MidiNoteManager)
-void sendMidiNoteOn1(int midiNote, uint8_t velocity, uint8_t channel)
-{
-    // Convert to use new MidiNoteManager with default gate duration
-    uint16_t defaultGateDuration = PULSES_PER_SEQUENCER_STEP / 2; // Default to half step
-    midiNoteManager.noteOn(0, static_cast<int8_t>(midiNote), velocity, channel, defaultGateDuration);
-}
-
-void sendMidiNoteOff1(uint8_t finalNoteValue, uint8_t channel)
-{
-    // Use MidiNoteManager for proper note-off handling
-    midiNoteManager.noteOff(0);
-}
-
-// Legacy Voice 2 MIDI Callbacks (refactored to use MidiNoteManager)
-void sendMidiNoteOn2(int midiNote, uint8_t velocity, uint8_t channel)
-{
-    // Convert to use new MidiNoteManager with default gate duration
-    uint16_t defaultGateDuration = PULSES_PER_SEQUENCER_STEP / 2; // Default to half step
-    midiNoteManager.noteOn(1, static_cast<int8_t>(midiNote), velocity, channel, defaultGateDuration);
-}
-
-void sendMidiNoteOff2(uint8_t finalNoteValue, uint8_t channel)
-{
-    // Use MidiNoteManager for proper note-off handling
-    midiNoteManager.noteOff(1);
-}
 
 // Enhanced allNotesOff function using MidiNoteManager
 void allNotesOff()

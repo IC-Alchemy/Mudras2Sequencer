@@ -1,7 +1,9 @@
 #include "UIEventHandler.h"
 #include "../sequencer/Sequencer.h"
+#include "../sequencer/ShuffleTemplates.h"
 #include "../midi/MidiManager.h"
 #include "ButtonManager.h"
+#include <uClock.h>
 
 // External function declarations that the UI calls
 extern void onClockStart();
@@ -61,11 +63,60 @@ void matrixEventHandler(const MatrixButtonEvent &evt, UIState& uiState, Sequence
         return; // Exit after handling
     }
 
+    // --- Handle step buttons in slide mode ---
+    if (uiState.slideMode && evt.buttonIndex < NUMBER_OF_STEP_BUTTONS) {
+        if (evt.type == MATRIX_BUTTON_PRESSED) {
+            Sequencer &currentActiveSeq = uiState.isVoice2Mode ? seq2 : seq1;
+            uint8_t currentSlideValue = currentActiveSeq.getStepParameterValue(ParamId::Slide, evt.buttonIndex);
+            uint8_t newSlideValue = (currentSlideValue > 0) ? 0 : 1;
+            currentActiveSeq.setStepParameterValue(ParamId::Slide, evt.buttonIndex, newSlideValue);
+            Serial.print("Step ");
+            Serial.print(evt.buttonIndex);
+            Serial.print(" slide ");
+            Serial.println(newSlideValue > 0 ? "ON" : "OFF");
+        }
+        return; // In slide mode, step buttons only toggle slide.
+    }
+
     // Handle other buttons
     if (handleParameterButtonEvent(evt, uiState)) return;
     if (handleStepButtonEvent(evt, uiState, seq1, seq2)) return;
 
-    // Handle control buttons (only on press)
+    // Handle Randomize 1 button with long press for reset
+    if (evt.buttonIndex == BUTTON_RANDOMIZE_SEQ1) {
+        if (evt.type == MATRIX_BUTTON_PRESSED) {
+            uiState.randomize1PressTime = millis();
+            uiState.randomize1WasPressed = true;
+            uiState.randomize1ResetTriggered = false; // Reset trigger flag
+        } else if (evt.type == MATRIX_BUTTON_RELEASED && uiState.randomize1WasPressed) {
+            uiState.randomize1WasPressed = false;
+            if (!uiState.randomize1ResetTriggered) { // Only randomize if reset was not triggered
+                seq1.randomizeParameters();
+                uiState.selectedStepForEdit = -1;
+                uiState.flash31Until = millis() + CONTROL_LED_FLASH_DURATION_MS;
+            }
+        }
+        return; // Exit after handling
+    }
+
+    // Handle Randomize 2 button with long press for reset
+    if (evt.buttonIndex == BUTTON_RANDOMIZE_SEQ2) {
+        if (evt.type == MATRIX_BUTTON_PRESSED) {
+            uiState.randomize2PressTime = millis();
+            uiState.randomize2WasPressed = true;
+            uiState.randomize2ResetTriggered = false; // Reset trigger flag
+        } else if (evt.type == MATRIX_BUTTON_RELEASED && uiState.randomize2WasPressed) {
+            uiState.randomize2WasPressed = false;
+            if (!uiState.randomize2ResetTriggered) { // Only randomize if reset was not triggered
+                seq2.randomizeParameters();
+                uiState.selectedStepForEdit = -1;
+                uiState.flash31Until = millis() + CONTROL_LED_FLASH_DURATION_MS;
+            }
+        }
+        return; // Exit after handling
+    }
+
+    // Handle other control buttons (only on press)
     if (evt.type == MATRIX_BUTTON_PRESSED) {
         handleControlButtonEvent(evt.buttonIndex, uiState, seq1, seq2);
     }
@@ -122,18 +173,6 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt, UIState& uiState
 
     // Select current active sequencer based on voice mode
     Sequencer &currentActiveSeq = uiState.isVoice2Mode ? seq2 : seq1;
-
-    // --- Slide mode: toggle slide for this step ---
-    if (uiState.slideMode && evt.type == MATRIX_BUTTON_PRESSED) {
-        uint8_t currentSlideValue = currentActiveSeq.getStepParameterValue(ParamId::Slide, evt.buttonIndex);
-        uint8_t newSlideValue = (currentSlideValue > 0) ? 0 : 1;
-        currentActiveSeq.setStepParameterValue(ParamId::Slide, evt.buttonIndex, newSlideValue);
-        Serial.print("Step ");
-        Serial.print(evt.buttonIndex);
-        Serial.print(" slide ");
-        Serial.println(newSlideValue > 0 ? "ON" : "OFF");
-        return true;
-    }
 
     // --- If holding any parameter button, pressing a step button will adjust length of corresponding parameter ---
     if (isAnyParameterButtonHeld(uiState) && evt.type == MATRIX_BUTTON_PRESSED) {
@@ -195,10 +234,18 @@ static void handleControlButtonEvent(uint8_t buttonIndex, UIState& uiState, Sequ
             uiState.currentThemeIndex = (uiState.currentThemeIndex + 1) % static_cast<int>(LEDTheme::COUNT);
             setLEDTheme(static_cast<LEDTheme>(uiState.currentThemeIndex));
             break;
-        case BUTTON_RESET_SEQUENCERS:
-            seq1.resetAllSteps();
-            seq2.resetAllSteps();
-            uiState.resetStepsLightsFlag = true;
+        case BUTTON_CHANGE_SWING_PATTERN:
+            uiState.currentShufflePatternIndex = (uiState.currentShufflePatternIndex + 1) % NUM_SHUFFLE_TEMPLATES;
+            {
+                const ShuffleTemplate& currentTemplate = shuffleTemplates[uiState.currentShufflePatternIndex];
+                
+                // Apply shuffle template to uClock
+                uClock.setShuffleTemplate(const_cast<int8_t*>(currentTemplate.ticks), SHUFFLE_TEMPLATE_SIZE);
+                uClock.setShuffle(uiState.currentShufflePatternIndex > 0); // Enable shuffle if not "No Shuffle"
+                
+                Serial.print("Shuffle pattern changed to: ");
+                Serial.println(currentTemplate.name);
+            }
             break;
         case BUTTON_RANDOMIZE_SEQ1:
             seq1.randomizeParameters();
@@ -282,5 +329,29 @@ static void handleAS5600ParameterControl(UIState& uiState) {
         case AS5600ParameterMode::LFO2freq: Serial.println("LFO2 Frequency"); break;
         case AS5600ParameterMode::LFO2amp: Serial.println("LFO2 Amplitude"); break;
         case AS5600ParameterMode::COUNT: break; // Should not happen
+    }
+}
+
+void pollUIHeldButtons(UIState& uiState, Sequencer& seq1, Sequencer& seq2) {
+    unsigned long currentTime = millis();
+
+    // Check for Randomize 1 long press
+    if (uiState.randomize1WasPressed && !uiState.randomize1ResetTriggered) {
+        if (isLongPress(currentTime - uiState.randomize1PressTime)) {
+            seq1.resetAllSteps();
+            uiState.resetStepsLightsFlag = true;
+            uiState.randomize1ResetTriggered = true; // Mark as triggered
+            Serial.println("Seq 1 reset by long press");
+        }
+    }
+
+    // Check for Randomize 2 long press
+    if (uiState.randomize2WasPressed && !uiState.randomize2ResetTriggered) {
+        if (isLongPress(currentTime - uiState.randomize2PressTime)) {
+            seq2.resetAllSteps();
+            uiState.resetStepsLightsFlag = true;
+            uiState.randomize2ResetTriggered = true; // Mark as triggered
+            Serial.println("Seq 2 reset by long press");
+        }
     }
 }

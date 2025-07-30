@@ -25,7 +25,7 @@ constexpr uint8_t BUTTON_AS5600_CONTROL = 25;
 constexpr uint8_t BUTTON_PLAY_STOP = 26;
 constexpr uint8_t BUTTON_CHANGE_SCALE = 27;
 constexpr uint8_t BUTTON_CHANGE_THEME = 28;
-constexpr uint8_t BUTTON_RESET_SEQUENCERS = 29;
+constexpr uint8_t BUTTON_CHANGE_SWING_PATTERN = 29;
 constexpr uint8_t BUTTON_RANDOMIZE_SEQ1 = 30;
 constexpr uint8_t BUTTON_RANDOMIZE_SEQ2 = 31;
 
@@ -52,5 +52,7 @@ void initUIEventHandler(UIState& uiState);
  * @param midiNoteManager Reference to the MIDI note manager.
  */
 void matrixEventHandler(const MatrixButtonEvent &evt, UIState& uiState, Sequencer& seq1, Sequencer& seq2, MidiNoteManager& midiNoteManager);
+
+void pollUIHeldButtons(UIState& uiState, Sequencer& seq1, Sequencer& seq2);
 
 #endif // UI_EVENT_HANDLER_H

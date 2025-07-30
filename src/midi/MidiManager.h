@@ -325,8 +325,6 @@ private:
 //   EXTERN DECLARATIONS
 // =======================
 
-// Scale system variables
-extern int scale[7][48];
 extern uint8_t currentScale;
 
 // Enhanced MIDI note management
@@ -355,10 +353,5 @@ extern volatile bool GATE2;
 
 // Legacy compatibility functions (will be refactored to use MidiNoteManager)
 int getMidiNote(uint8_t finalNoteValue);
-void sendMidiNoteOn1(int midiNote, uint8_t velocity, uint8_t channel);
-void sendMidiNoteOff1(uint8_t finalNoteValue, uint8_t channel);
-void sendMidiNoteOn2(int midiNote, uint8_t velocity, uint8_t channel);
-void sendMidiNoteOff2(uint8_t finalNoteValue, uint8_t channel);
-void allNotesOff();
 
 #endif // MIDI_MANAGER_H

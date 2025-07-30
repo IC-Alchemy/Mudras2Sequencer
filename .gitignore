@@ -1,22 +1,16 @@
-# Build directory
+# Arduino build files
 build/
-build/*
-PROGRAMMERS_MANUAL.md
-.vscode/
-*.swp
-*~
-.roo/*
+*.o
+*.d
+*.eep
+*.elf
+*.hex
+*.map
+*.lss
 
-CMakeFiles/
-CMakeCache.txt
-cmake_install.cmake
-src/audio/GEMINI.md
-src/LEDMatrix/LEDController_README.md
-src/sensors/GEMINI.md
-src/sequencer/GEMINI.md
-src/ui/GEMINI.md
-src/LEDMatrix/LEDController_README.md
+# Local configuration
+.vscode/
+.roo/rules/rules.md
+.gitignore
 PROGRAMMERS_MANUAL.md
-GEMINI.md
-.roo/** 
-test_midi_implementation.cpp
+.github/copilot-instructions.md
