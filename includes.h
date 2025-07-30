@@ -15,6 +15,8 @@
 #include "src/dsp/svf.h"
 #include "src/dsp/oscillator.h"
 #include "src/dsp/delayline.h"
+#include "src/scales/scales.h"
+
 
 // Matrix and Sequencer
 #include "src/matrix/Matrix.h"

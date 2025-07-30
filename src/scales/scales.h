@@ -3,13 +3,9 @@
 
 #include <Arduino.h>
 
-struct Scale {
-    const char* name;
-    const int* intervals;
-    uint8_t count;
-};
-
-extern const Scale scales[];
-extern const uint8_t num_scales;
+// Scale arrays
+extern int scale[7][48];
+extern const char* scaleNames[7];
+extern uint8_t currentScale;
 
 #endif // SCALES_H

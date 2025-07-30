@@ -124,44 +124,32 @@ float delayTimeSmoothing(float currentDelay, float targetDelay, float slewRate)
 }
 
 
-int scale[7][48] = {
-    // C Mixolydian
-    {0, 2, 4, 5, 7, 9, 10, 12, 14, 16, 17, 19, 21, 22, 24, 26,
-     28, 29, 31, 33, 34, 36, 38, 40, 41, 43, 45, 46, 48, 50, 52, 53,
-     55, 57, 58, 60, 62, 64, 65, 67, 69, 70, 72, 72, 72, 72, 72, 72},
-    // Pentatonic Minor
-    {0, 0, 3, 3, 5, 5, 7, 7, 10, 10, 12, 12, 15, 15, 17, 17,
-     19, 19, 22, 22, 24, 24, 27, 29, 29, 29, 32, 32, 34, 34, 36, 36,
-     39, 39, 41, 41, 43, 43, 46, 46, 48, 48, 51, 53, 53, 53, 53, 53},
-    // Dorian
-    {0, 2, 3, 5, 7, 8, 10, 12, 14, 15, 17, 19, 20, 22, 24, 26,
-     27, 29, 31, 32, 34, 36, 38, 39, 41, 43, 44, 46, 48, 50, 51, 53,
-     55, 56, 58, 60, 62, 63, 65, 67, 68, 70, 72, 72, 72, 72, 72, 72},
-    // Phrygian Dominant
-    {0, 1, 4, 5, 7, 8, 10, 12, 13, 16, 17, 19, 20, 22, 24, 25,
-     28, 29, 31, 32, 34, 36, 37, 40, 41, 43, 44, 46, 48, 49, 52, 53,
-     55, 56, 58, 60, 61, 64, 65, 67, 68, 70, 72, 72, 72, 72, 72, 72},
-    //  Lydian Dominant
-    {0, 2, 4, 6, 7, 9, 10, 12, 14, 16, 18, 19, 21, 22, 24, 26,
-     28, 30, 31, 33, 34, 36, 38, 40, 42, 43, 45, 46, 48, 50, 52, 54,
-     55, 57, 58, 60, 62, 64, 66, 67, 69, 70, 72, 72, 72, 72, 72, 72},
-    // wholetone
-    {0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30,
-     32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54, 56, 58, 60, 62,
-     64, 66, 68, 70, 72, 72, 72, 72, 72, 72, 72, 72, 72, 72, 72, 72},
-
-    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
-     16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
-     32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47}
-
-};
-
 // --- Clock Callbacks ---
 void onSync24Callback(uint32_t tick)
 {
     usb_midi.sendRealTime(midi::Clock);
 }
+void muteOscillators()
+{
 
+    osc1A.SetAmp(0.0f);
+    osc1B.SetAmp(0.0f); 
+    osc1C.SetAmp(0.0f);
+    osc2A.SetAmp(0.0f);
+    osc2B.SetAmp(0.0f);
+    osc2C.SetAmp(0.0f);
+}
+void unmuteOscillators()
+{
+
+    osc1A.SetAmp(.5f);
+    osc1B.SetAmp(.5f);
+    osc1C.SetAmp(.5f);
+
+    osc2A.SetAmp(.5f);
+    osc2B.SetAmp(.5f);
+    osc2C.SetAmp(1.f);
+}
 void onClockStart()
 {
     Serial.println("[uClock] onClockStart()");
@@ -169,6 +157,7 @@ void onClockStart()
     seq1.start();
     seq2.start();
     isClockRunning = true;
+    unmuteOscillators();
 }
 
 void onClockStop()
@@ -180,10 +169,10 @@ void onClockStop()
 
     // Use MidiNoteManager for comprehensive cleanup
     midiNoteManager.onSequencerStop();
+    
 
     // Legacy allNotesOff() call for sequencer state cleanup
-    allNotesOff();
-
+muteOscillators();
     isClockRunning = false;
 }
 
@@ -844,12 +833,11 @@ void setup1()
     uClock.setOnOutputPPQN(onOutputPPQNCallback);
     uClock.setTempo(90);
     uClock.start();
+    uClock.setShuffle(true); 
     seq1.start();
     seq2.start();
 
-    // Note On events are handled within `updateVoiceParameters` when a gate turns on.
-    seq1.setMidiNoteOffCallback(sendMidiNoteOff1);
-    seq2.setMidiNoteOffCallback(sendMidiNoteOff2);
+
 
     Serial.println("[CORE1] Setup complete!");
 }

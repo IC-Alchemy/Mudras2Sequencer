@@ -67,20 +67,49 @@ void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Se
         display.print("Edit Step: ");
         display.println(uiState.selectedStepForEdit + 1);
     } else {
-        // Default screen: Show current scale and shuffle pattern
+        // Default screen: Show current scale and shuffle pattern with enhanced formatting
         display.setTextSize(1);
-
-        // Display Scale Name
-        extern uint8_t currentScale;
-        display.setCursor(5, 15);
-        display.print("Scale: ");
-        display.println(scales[currentScale].name);
-
-        // Display Shuffle Pattern
-        extern const ShuffleTemplate shuffleTemplates[];
-        display.setCursor(5, 35);
-        display.print("Shuffle: ");
-        display.println(shuffleTemplates[uiState.currentShufflePatternIndex].name);
+        
+        // Header with title
+        display.setCursor(25, 5);
+        display.setTextSize(1);
+        display.print("Mudras Sequencer");
+        
+        // Horizontal line under header
+        display.drawFastHLine(5, 14, SCREEN_WIDTH - 10, SH110X_WHITE);
+        
+        // Scale section with icon
+        display.setCursor(5, 20);
+        display.print("\x10"); // Musical note symbol
+        display.setCursor(15, 20);
+        display.print("Scale:");
+        
+        display.setCursor(55, 20);
+        display.setTextSize(1);
+        display.print(scaleNames[currentScale]);
+        
+        // Separator line
+        display.drawFastHLine(10, 30, SCREEN_WIDTH - 20, SH110X_WHITE);
+        
+        // Shuffle section with icon
+        display.setCursor(5, 36);
+        display.print("\x7E"); // Tilde symbol for shuffle
+        display.setCursor(15, 36);
+        display.print("Shuffle:");
+        
+        display.setCursor(65, 36);
+        display.print(getShuffleTemplateName(uiState.currentShufflePatternIndex));
+        
+        // Bottom status line
+        display.drawFastHLine(5, 48, SCREEN_WIDTH - 10, SH110X_WHITE);
+        display.setCursor(5, 52);
+        display.setTextSize(1);
+        display.print("Voice: ");
+        display.print(uiState.isVoice2Mode ? "2" : "1");
+        
+        // Current step indicator
+        display.setCursor(70, 52);
+        display.print("Ready");
     }
 
     display.display();

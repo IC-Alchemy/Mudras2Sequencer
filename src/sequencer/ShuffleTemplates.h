@@ -1,7 +1,7 @@
 #ifndef SHUFFLE_TEMPLATES_H
 #define SHUFFLE_TEMPLATES_H
 
-#include <cstdint>
+#include <Arduino.h>
 
 const int NUM_SHUFFLE_TEMPLATES = 16;
 const int SHUFFLE_TEMPLATE_SIZE = 16; // Explicitly define template size
@@ -32,7 +32,15 @@ const ShuffleTemplate shuffleTemplates[NUM_SHUFFLE_TEMPLATES] = {
 {"Dragging", {10, 25, 10, 20, 10, 25, 10, 20, 10, 25, 10, 20, 10, 25, 10, 20}},
 {"Random 1", {0, 15, -10, 25, 0, 5, -20, 10, 0, 20, -5, 15, 0, 10, -15, 5}},
 {"Random 2", {5, -5, 10, -10, 15, -15, 20, -20, 5, -5, 10, -10, 15, -15, 20, -20}},
-{"Random 2", {5, -5, 10, -10, 15, -15, 20, -20, 5, -5, 10, -10, 15, -15, 20, -20}},
+{"Polyrhythm", {0, 0, 0, 30, 0, 0, 30, 0, 0, 30, 0, 0, 30, 0, 0, 0}},
 
 };
+
+// Helper function to get shuffle template name for OLED display
+inline const char* getShuffleTemplateName(uint8_t index) {
+    if (index >= NUM_SHUFFLE_TEMPLATES) {
+        return "Invalid";
+    }
+    return shuffleTemplates[index].name;
+}
 #endif // SHUFFLE_TEMPLATES_H

@@ -36,6 +36,17 @@ struct UIState {
     unsigned long button24PressTime = 0;
     bool button24WasPressed = false;
 
+    // --- Randomize Button States ---
+    unsigned long randomize1PressTime = 0;
+    bool randomize1WasPressed = false;
+    bool randomize1ResetTriggered = false;
+    unsigned long randomize2PressTime = 0;
+    bool randomize2WasPressed = false;
+    bool randomize2ResetTriggered = false;
+
+    // --- Shuffle State ---
+    uint8_t currentShufflePatternIndex = 0;
+
     // --- Flags ---
     // Flag to signal the LED matrix to reset step lights.
     bool resetStepsLightsFlag = false;
