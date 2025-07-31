@@ -25,8 +25,8 @@ daisysp::Adsr env1, env2;
 daisysp::DelayLine<float, MAX_DELAY_SAMPLES> del1;
 float feedbackGain1 = 0.65f;
  float currentDelayOutputGain = 0.0f; // For smooth delay output fade
-
- float currentFeedbackGain = 0.0f; // For smooth delay feedback fade
+OLEDDisplay display;
+float currentFeedbackGain = 0.0f; // For smooth delay feedback fade
 
 daisysp::LadderFilter filt1, filt2;
 
@@ -666,7 +666,7 @@ void fill_audio_buffer(audio_buffer_t *buffer)
         float current_filter_env_value2 = env2.Process(GATE2);
         filt2.SetFreq((filterfreq2 * current_filter_env_value2) );
 
-        float voice2 = (osc2A.Process() + osc2B.Process()+osc2C.Process() ) *.6f;
+        float voice2 = (osc2A.Process() + osc2B.Process()+osc2C.Process()*2.f ) *.6f;
         float filtered_signal2 = filt2.Process(voice2) ; 
 
         highPass2.Process(filtered_signal2);
@@ -796,6 +796,10 @@ void setup1()
 
     initUIEventHandler(uiState);
 
+    // Initialize OLED display
+    display.begin();
+    Serial.println("OLED display initialized");
+
     Matrix_init(&touchSensor);
     Serial.println("Matrix initialized");
     
@@ -871,19 +875,6 @@ void loop1()
     // Check if any parameter buttons are held for prioritized sensor updates
     bool parameterRecordingActive = isAnyParameterButtonHeld(uiState);
 
-    // Update sensor once per loop iteration (avoid multiple calls)
-    distanceSensor.update();
-    // Update global mm variable for backward compatibility
-    int rawValue = distanceSensor.getRawValue();
-    if (rawValue >= MIN_HEIGHT && rawValue <= MAX_HEIGHT)
-    {
-        mm = rawValue - MIN_HEIGHT;
-    }
-    else
-    {
-        mm = 0; // Invalid reading
-    }
-
     // Update AS5600 sensor and base values
     as5600Sensor.update();
     updateAS5600BaseValues(uiState);
@@ -938,21 +929,37 @@ void loop1()
     }
 
 
+    static unsigned long lastLEDUpdate = 0;
+    const unsigned long LED_UPDATE_INTERVAL = 20; // 20ms interval
 
     uint16_t currtouched = touchSensor.touched();
-
-  
-
-    // Always scan the matrix regardless of timing - this is critical for debugging
+    
     Matrix_scan();
- 
-        updateStepLEDs(ledMatrix, seq1, seq2, uiState, mm);
 
+    // Update LEDs only every 20ms
+    if (currentMillis - lastLEDUpdate >= LED_UPDATE_INTERVAL) {
+        lastLEDUpdate = currentMillis;
+        
+    // Update sensor once per loop iteration (avoid multiple calls)
+    distanceSensor.update();
+    // Update global mm variable for backward compatibility
+    int rawValue = distanceSensor.getRawValue();
+    if (rawValue >= MIN_HEIGHT && rawValue <= MAX_HEIGHT)
+    {
+        mm = rawValue - MIN_HEIGHT;
+    }
+    else
+    {
+        mm = 0; // Invalid reading
+    }
+
+        updateStepLEDs(ledMatrix, seq1, seq2, uiState, mm);
+        display.update(uiState, seq1, seq2);
         // LFO LED pulse states are updated directly in fill_audio_buffer()
 
-        updateControlLEDs(ledMatrix, uiState);
+        updateControlLEDs(ledMatrix, uiState);  
         ledMatrix.show();
-
+    }
         if (uiState.selectedStepForEdit != -1)
         {
             updateParametersForStep(uiState.selectedStepForEdit);

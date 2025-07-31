@@ -80,7 +80,7 @@ void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Se
         
         // Scale section with icon
         display.setCursor(5, 20);
-        display.print("\x10"); // Musical note symbol
+      //  display.print("\x10"); // Musical note symbol
         display.setCursor(15, 20);
         display.print("Scale:");
         
@@ -89,11 +89,11 @@ void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Se
         display.print(scaleNames[currentScale]);
         
         // Separator line
-        display.drawFastHLine(10, 30, SCREEN_WIDTH - 20, SH110X_WHITE);
+       // display.drawFastHLine(10, 30, SCREEN_WIDTH - 20, SH110X_WHITE);
         
         // Shuffle section with icon
         display.setCursor(5, 36);
-        display.print("\x7E"); // Tilde symbol for shuffle
+     //   display.print("\x7E"); // Tilde symbol for shuffle
         display.setCursor(15, 36);
         display.print("Shuffle:");
         
@@ -101,7 +101,7 @@ void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Se
         display.print(getShuffleTemplateName(uiState.currentShufflePatternIndex));
         
         // Bottom status line
-        display.drawFastHLine(5, 48, SCREEN_WIDTH - 10, SH110X_WHITE);
+     //   display.drawFastHLine(5, 48, SCREEN_WIDTH - 10, SH110X_WHITE);
         display.setCursor(5, 52);
         display.setTextSize(1);
         display.print("Voice: ");
@@ -109,7 +109,6 @@ void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Se
         
         // Current step indicator
         display.setCursor(70, 52);
-        display.print("Ready");
     }
 
     display.display();
@@ -184,7 +183,10 @@ String OLEDDisplay::formatParameterValue(ParamId paramId, float value) {
             return String((int)(value * 100)) + "%";
             
         case ParamId::Filter:
-            return String((int)calculateFilterFrequency(value)) + "Hz";
+        {
+            int filterFreq =  daisysp::fmap(value, 100.0f, 6710.0f, daisysp::Mapping::EXP);
+            return String((int)(filterFreq)) + "Hz";
+        }
             
         case ParamId::Attack:
             return String(value, 3) + "s";

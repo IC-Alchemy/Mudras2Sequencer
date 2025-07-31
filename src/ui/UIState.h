@@ -50,6 +50,9 @@ struct UIState {
     // --- Flags ---
     // Flag to signal the LED matrix to reset step lights.
     bool resetStepsLightsFlag = false;
+
+   // --- Debounce for Slide Mode Toggle ---
+   unsigned long lastSlideModeToggleTime = 0;
 };
 
 #endif // UI_STATE_H

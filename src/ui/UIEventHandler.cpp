@@ -2,6 +2,7 @@
 #include "../sequencer/Sequencer.h"
 #include "../sequencer/ShuffleTemplates.h"
 #include "../midi/MidiManager.h"
+#include "../scales/scales.h"
 #include "ButtonManager.h"
 #include <uClock.h>
 
@@ -38,30 +39,55 @@ void matrixEventHandler(const MatrixButtonEvent &evt, UIState& uiState, Sequence
         }
         return; // Exit after handling
     }
-
-    // Handle Voice Switch (Button 24) with long press for LFO mode
-    if (evt.buttonIndex == BUTTON_VOICE_SWITCH) {
-        if (evt.type == MATRIX_BUTTON_PRESSED) {
-            uiState.button24PressTime = millis();
-            uiState.button24WasPressed = true;
-        } else if (evt.type == MATRIX_BUTTON_RELEASED && uiState.button24WasPressed) {
-            unsigned long pressDuration = millis() - uiState.button24PressTime;
-            uiState.button24WasPressed = false;
-
-            if (isLongPress(pressDuration)) {
-                uiState.lfoAssignMode = true;
-                Serial.print("Entered LFO assignment mode for ");
-                Serial.println(uiState.isVoice2Mode ? "LFO2 (Voice 2)" : "LFO1 (Voice 1)");
-            } else {
-                midiNoteManager.onModeSwitch();
-                uiState.isVoice2Mode = !uiState.isVoice2Mode;
+// Handle Slide Mode toggle (Button 22)
+if (evt.buttonIndex == BUTTON_SLIDE_MODE) {
+    if (evt.type == MATRIX_BUTTON_PRESSED) {
+        unsigned long now = millis();
+        const unsigned long SLIDE_MODE_DEBOUNCE_MS = 150;
+        if (now - uiState.lastSlideModeToggleTime >= SLIDE_MODE_DEBOUNCE_MS) {
+            uiState.lastSlideModeToggleTime = now;
+            // Toggle slide mode on press
+            uiState.slideMode = !uiState.slideMode;
+            if (uiState.slideMode) {
+                // Clear conflicting modes when entering slide mode
+                for (int i = 0; i < PARAM_ID_COUNT; ++i) {
+                    uiState.parameterButtonHeld[i] = false;
+                }
+                uiState.modGateParamSeqLengthsMode = false;
                 uiState.selectedStepForEdit = -1;
-                Serial.print("Switched to Voice ");
-                Serial.println(uiState.isVoice2Mode ? "2" : "1");
+                Serial.println("Entered Slide Mode");
+            } else {
+                Serial.println("Exited Slide Mode");
             }
         }
-        return; // Exit after handling
     }
+    return; // Exit after handling
+}
+
+// Handle Voice Switch (Button 24) with long press for LFO mode
+if (evt.buttonIndex == BUTTON_VOICE_SWITCH) {
+    if (evt.type == MATRIX_BUTTON_PRESSED) {
+        uiState.button24PressTime = millis();
+        uiState.button24WasPressed = true;
+    } else if (evt.type == MATRIX_BUTTON_RELEASED && uiState.button24WasPressed) {
+        unsigned long pressDuration = millis() - uiState.button24PressTime;
+        uiState.button24WasPressed = false;
+
+        if (isLongPress(pressDuration)) {
+            uiState.lfoAssignMode = true;
+            Serial.print("Entered LFO assignment mode for ");
+            Serial.println(uiState.isVoice2Mode ? "LFO2 (Voice 2)" : "LFO1 (Voice 1)");
+        } else {
+            midiNoteManager.onModeSwitch();
+            uiState.isVoice2Mode = !uiState.isVoice2Mode;
+            uiState.selectedStepForEdit = -1;
+            Serial.print("Switched to Voice ");
+            Serial.println(uiState.isVoice2Mode ? "2" : "1");
+        }
+    }
+    return; // Exit after handling
+}
+    
 
     // --- Handle step buttons in slide mode ---
     if (uiState.slideMode && evt.buttonIndex < NUMBER_OF_STEP_BUTTONS) {
@@ -115,7 +141,7 @@ void matrixEventHandler(const MatrixButtonEvent &evt, UIState& uiState, Sequence
         }
         return; // Exit after handling
     }
-
+    
     // Handle other control buttons (only on press)
     if (evt.type == MATRIX_BUTTON_PRESSED) {
         handleControlButtonEvent(evt.buttonIndex, uiState, seq1, seq2);
@@ -140,6 +166,10 @@ void matrixEventHandler(const MatrixButtonEvent &evt, UIState& uiState, Sequence
  * @return true if the event was handled as a parameter button event; false otherwise.
  */
 static bool handleParameterButtonEvent(const MatrixButtonEvent &evt, UIState& uiState) {
+    // Block parameter button handling in slide mode
+    if (uiState.slideMode) {
+        return false;
+    }
     for (size_t i = 0; i < PARAM_BUTTON_MAPPINGS_SIZE; ++i) {
         const auto &mapping = PARAM_BUTTON_MAPPINGS[i];
         if (evt.buttonIndex == mapping.buttonIndex) {
@@ -229,6 +259,11 @@ static void handleControlButtonEvent(uint8_t buttonIndex, UIState& uiState, Sequ
             break;
         case BUTTON_CHANGE_SCALE:
             currentScale = (currentScale + 1) % 7;
+            Serial.print("Scale changed to: ");
+            Serial.print(currentScale);
+            Serial.print(" (");
+            Serial.print(scaleNames[currentScale]);
+            Serial.println(")");
             break;
         case BUTTON_CHANGE_THEME:
             uiState.currentThemeIndex = (uiState.currentThemeIndex + 1) % static_cast<int>(LEDTheme::COUNT);
@@ -243,7 +278,9 @@ static void handleControlButtonEvent(uint8_t buttonIndex, UIState& uiState, Sequ
                 uClock.setShuffleTemplate(const_cast<int8_t*>(currentTemplate.ticks), SHUFFLE_TEMPLATE_SIZE);
                 uClock.setShuffle(uiState.currentShufflePatternIndex > 0); // Enable shuffle if not "No Shuffle"
                 
-                Serial.print("Shuffle pattern changed to: ");
+                Serial.print("Shuffle pattern changed to index ");
+                Serial.print(uiState.currentShufflePatternIndex);
+                Serial.print(": ");
                 Serial.println(currentTemplate.name);
             }
             break;

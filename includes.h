@@ -6,6 +6,9 @@
 #include <Adafruit_MPR121.h> // MAKE SURE TO ENABLE AUTOCONFIG IN MPR121.H
 #include <MIDI.h>
 #include <Adafruit_TinyUSB.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SH110X.h>
+
 
 // Audio and DSP
 #include "src/audio/audio.h"
@@ -38,6 +41,9 @@
 #include "src/ui/UIEventHandler.h"
 #include "src/ui/ButtonManager.h"
 #include "src/ui/UIState.h"
+
+// OLED Display
+#include "src/OLED/oled.h"
 
 // Standard libraries
 #include <Wire.h>

@@ -52,6 +52,10 @@ bool isLongPress(unsigned long pressDuration) {
 bool isAnyParameterButtonHeld(const UIState& uiState) {
     for (size_t i = 0; i < PARAM_BUTTON_MAPPINGS_SIZE; ++i) {
         ParamId paramId = PARAM_BUTTON_MAPPINGS[i].paramId;
+        // Skip Slide param if in slide mode
+        if (paramId == ParamId::Slide && uiState.slideMode) {
+            continue;
+        }
         if (uiState.parameterButtonHeld[static_cast<int>(paramId)]) {
             return true;
         }
@@ -62,6 +66,10 @@ bool isAnyParameterButtonHeld(const UIState& uiState) {
 const ParamButtonMapping* getHeldParameterButton(const UIState& uiState) {
     for (size_t i = 0; i < PARAM_BUTTON_MAPPINGS_SIZE; ++i) {
         const auto& mapping = PARAM_BUTTON_MAPPINGS[i];
+        // Skip Slide param if in slide mode
+        if (mapping.paramId == ParamId::Slide && uiState.slideMode) {
+            continue;
+        }
         if (uiState.parameterButtonHeld[static_cast<int>(mapping.paramId)]) {
             return &mapping;
         }
