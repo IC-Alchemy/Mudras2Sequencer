@@ -126,8 +126,9 @@ if (evt.buttonIndex == BUTTON_VOICE_SWITCH) {
                 seq1.randomizeParameters();
                 Serial.println("Seq 1 randomized by short press");
             }
-            // Note: do not clear press state here; pollUIHeldButtons will handle it
+            // Reset button state flags
             uiState.randomize1WasPressed = false;
+            uiState.randomize1ResetTriggered = false;
             // Common UI updates
             uiState.selectedStepForEdit = -1;
             uiState.flash31Until = millis() + CONTROL_LED_FLASH_DURATION_MS;
@@ -149,8 +150,9 @@ if (evt.buttonIndex == BUTTON_VOICE_SWITCH) {
                 seq2.randomizeParameters();
                 Serial.println("Seq 2 randomized by short press");
             }
-            // Note: do not clear press state here; pollUIHeldButtons will handle it
+            // Reset button state flags
             uiState.randomize2WasPressed = false;
+            uiState.randomize2ResetTriggered = false;
             // Common UI updates
             uiState.selectedStepForEdit = -1;
             uiState.flash31Until = millis() + CONTROL_LED_FLASH_DURATION_MS;

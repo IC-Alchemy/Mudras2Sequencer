@@ -1,5 +1,6 @@
 #include "Voice.h"
 #include "../scales/scales.h"
+#include "../dsp/dsp.h"
 #include "Arduino.h"
 #include <algorithm>
 #include <cmath>
@@ -216,13 +217,11 @@ float Voice::calculateNoteFrequency(float note, int8_t octaveOffset) {
     extern uint8_t currentScale;
     int scaleNote = scale[currentScale][noteIndex];
     
-    // Convert MIDI note to frequency
-    float scaleFreq = 440.0f * std::pow(2.0f, (scaleNote - 69) / 12.0f);
+    // Use mtof() with proper MIDI note calculation (original approach)
+    // Add 48 to center the scale around middle C, then add octave offset
+    float midiNote = scaleNote + 48 + octaveOffset;
     
-    // Apply octave offset
-    float octaveMultiplier = std::pow(2.0f, octaveOffset / 12.0f);
-    
-    return scaleFreq * octaveMultiplier;
+    return daisysp::mtof(midiNote);
 }
 
 void Voice::processFrequencySlew(uint8_t oscIndex, float targetFreq) {

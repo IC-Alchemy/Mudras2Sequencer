@@ -1,5 +1,6 @@
 #include "includes.h"
 #include "diagnostic.h"
+#include "src/voice/Voice.h"
 
 // =======================
 //   GLOBAL VARIABLES
@@ -207,10 +208,10 @@ void initOscillators()
     voiceManager = std::make_unique<VoiceManager>(SAMPLE_RATE);
     
     // Create Lead Voice (Voice 1 replacement)
-    leadVoiceId = voiceManager->addVoice(VoicePresets::getLeadVoice());
+    leadVoiceId = voiceManager->addVoice(VoicePresets::getAnalogVoice());
     
     // Create Bass Voice (Voice 2 replacement)
-    bassVoiceId = voiceManager->addVoice(VoicePresets::getBassVoice());
+    bassVoiceId = voiceManager->addVoice(VoicePresets::getDigitalVoice());
     
     // Attach sequencers to voices
     voiceManager->attachSequencer(leadVoiceId, &seq1);
@@ -520,18 +521,17 @@ void fill_audio_buffer(audio_buffer_t *buffer)
         
         // Write to delay line: dry input + filtered feedback
         // Clamp feedback to prevent runaway
-        filteredFeedback = std::max(-1.0f, std::min(filteredFeedback, 1.0f));
+        filteredFeedback = std::max(-1.0f, std::min(filteredFeedback, .9f));
         del1.Write(finalvoice + filteredFeedback);
         
         // Mix dry and wet signals
         output = finalvoice + (delout * currentDelayOutputGain);
         
-        // Soft clipping to prevent harsh distortion
-        output = std::tanh(output * 0.7f);
+     
 
         // Output to stereo channels
-        out[2 * i + 0] = convertSampleToInt16(output);
-        out[2 * i + 1] = convertSampleToInt16(output);
+        out[2 * i + 0] = convertSampleToInt16(output*.75f);
+        out[2 * i + 1] = convertSampleToInt16(output*.75f);
     }
 
     buffer->sample_count = N;
