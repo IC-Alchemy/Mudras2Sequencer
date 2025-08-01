@@ -40,7 +40,7 @@ c/o stephen mccaul
 inline float fmax(float a, float b)
 {
     float r;
-#ifdef __arm__
+#if defined(__arm__) && !defined(ARDUINO_ARCH_RP2040)
     asm("vmaxnm.f32 %[d], %[n], %[m]" : [d] "=t"(r) : [n] "t"(a), [m] "t"(b) :);
 #else
     r = (a > b) ? a : b;
@@ -51,7 +51,7 @@ inline float fmax(float a, float b)
 inline float fmin(float a, float b)
 {
     float r;
-#ifdef __arm__
+#if defined(__arm__) && !defined(ARDUINO_ARCH_RP2040)
     asm("vminnm.f32 %[d], %[n], %[m]" : [d] "=t"(r) : [n] "t"(a), [m] "t"(b) :);
 #else
     r = (a < b) ? a : b;

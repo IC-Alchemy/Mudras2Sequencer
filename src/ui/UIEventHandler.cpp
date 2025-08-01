@@ -30,6 +30,9 @@ void initUIEventHandler(UIState& uiState) {
 }
 
 void matrixEventHandler(const MatrixButtonEvent &evt, UIState& uiState, Sequencer& seq1, Sequencer& seq2, MidiNoteManager& midiNoteManager) {
+    // Check and trigger any pending long-press resets immediately
+    pollUIHeldButtons(uiState, seq1, seq2);
+
     // Handle LFO assignment mode
     if (uiState.lfoAssignMode) {
         if (evt.type == MATRIX_BUTTON_PRESSED) {
@@ -108,36 +111,49 @@ if (evt.buttonIndex == BUTTON_VOICE_SWITCH) {
     if (handleParameterButtonEvent(evt, uiState)) return;
     if (handleStepButtonEvent(evt, uiState, seq1, seq2)) return;
 
-    // Handle Randomize 1 button with long press for reset
+
+    // Handle Randomize 1 button: short press randomizes, long press resets immediately
     if (evt.buttonIndex == BUTTON_RANDOMIZE_SEQ1) {
         if (evt.type == MATRIX_BUTTON_PRESSED) {
+            // Record press start time
             uiState.randomize1PressTime = millis();
             uiState.randomize1WasPressed = true;
-            uiState.randomize1ResetTriggered = false; // Reset trigger flag
-        } else if (evt.type == MATRIX_BUTTON_RELEASED && uiState.randomize1WasPressed) {
-            uiState.randomize1WasPressed = false;
-            if (!uiState.randomize1ResetTriggered) { // Only randomize if reset was not triggered
+        } else if (evt.type == MATRIX_BUTTON_RELEASED) {
+            // Calculate press duration
+            unsigned long heldTime = millis() - uiState.randomize1PressTime;
+            if (!isLongPress(heldTime)) {
+                // Short press: randomize parameters
                 seq1.randomizeParameters();
-                uiState.selectedStepForEdit = -1;
-                uiState.flash31Until = millis() + CONTROL_LED_FLASH_DURATION_MS;
+                Serial.println("Seq 1 randomized by short press");
             }
+            // Note: do not clear press state here; pollUIHeldButtons will handle it
+            uiState.randomize1WasPressed = false;
+            // Common UI updates
+            uiState.selectedStepForEdit = -1;
+            uiState.flash31Until = millis() + CONTROL_LED_FLASH_DURATION_MS;
         }
         return; // Exit after handling
     }
 
-    // Handle Randomize 2 button with long press for reset
+    // Handle Randomize 2 button: short press randomizes, long press resets immediately
     if (evt.buttonIndex == BUTTON_RANDOMIZE_SEQ2) {
         if (evt.type == MATRIX_BUTTON_PRESSED) {
+            // Record press start time
             uiState.randomize2PressTime = millis();
             uiState.randomize2WasPressed = true;
-            uiState.randomize2ResetTriggered = false; // Reset trigger flag
-        } else if (evt.type == MATRIX_BUTTON_RELEASED && uiState.randomize2WasPressed) {
-            uiState.randomize2WasPressed = false;
-            if (!uiState.randomize2ResetTriggered) { // Only randomize if reset was not triggered
+        } else if (evt.type == MATRIX_BUTTON_RELEASED) {
+            // Calculate press duration
+            unsigned long heldTime = millis() - uiState.randomize2PressTime;
+            if (!isLongPress(heldTime)) {
+                // Short press: randomize parameters
                 seq2.randomizeParameters();
-                uiState.selectedStepForEdit = -1;
-                uiState.flash31Until = millis() + CONTROL_LED_FLASH_DURATION_MS;
+                Serial.println("Seq 2 randomized by short press");
             }
+            // Note: do not clear press state here; pollUIHeldButtons will handle it
+            uiState.randomize2WasPressed = false;
+            // Common UI updates
+            uiState.selectedStepForEdit = -1;
+            uiState.flash31Until = millis() + CONTROL_LED_FLASH_DURATION_MS;
         }
         return; // Exit after handling
     }
@@ -284,16 +300,7 @@ static void handleControlButtonEvent(uint8_t buttonIndex, UIState& uiState, Sequ
                 Serial.println(currentTemplate.name);
             }
             break;
-        case BUTTON_RANDOMIZE_SEQ1:
-            seq1.randomizeParameters();
-            uiState.selectedStepForEdit = -1;
-            uiState.flash31Until = millis() + CONTROL_LED_FLASH_DURATION_MS;
-            break;
-        case BUTTON_RANDOMIZE_SEQ2:
-            seq2.randomizeParameters();
-            uiState.selectedStepForEdit = -1;
-            uiState.flash31Until = millis() + CONTROL_LED_FLASH_DURATION_MS;
-            break;
+
         case BUTTON_TOGGLE_DELAY:
             uiState.delayOn = !uiState.delayOn;
             uiState.flash23Until = millis() + CONTROL_LED_FLASH_DURATION_MS;
@@ -368,27 +375,29 @@ static void handleAS5600ParameterControl(UIState& uiState) {
         case AS5600ParameterMode::COUNT: break; // Should not happen
     }
 }
-
-void pollUIHeldButtons(UIState& uiState, Sequencer& seq1, Sequencer& seq2) {
-    unsigned long currentTime = millis();
-
-    // Check for Randomize 1 long press
-    if (uiState.randomize1WasPressed && !uiState.randomize1ResetTriggered) {
-        if (isLongPress(currentTime - uiState.randomize1PressTime)) {
-            seq1.resetAllSteps();
-            uiState.resetStepsLightsFlag = true;
-            uiState.randomize1ResetTriggered = true; // Mark as triggered
-            Serial.println("Seq 1 reset by long press");
+    void pollUIHeldButtons(UIState& uiState, Sequencer& seq1, Sequencer& seq2) {
+        unsigned long currentTime = millis();
+     
+        // Check for Randomize 1 long press
+        if (uiState.randomize1WasPressed && !uiState.randomize1ResetTriggered) {
+            if (isLongPress(currentTime - uiState.randomize1PressTime)) {
+                seq1.resetAllSteps();
+                uiState.resetStepsLightsFlag = true;
+                uiState.randomize1ResetTriggered = true;
+                Serial.println("Seq 1 reset by long press");
+            }
         }
-    }
-
-    // Check for Randomize 2 long press
-    if (uiState.randomize2WasPressed && !uiState.randomize2ResetTriggered) {
-        if (isLongPress(currentTime - uiState.randomize2PressTime)) {
-            seq2.resetAllSteps();
-            uiState.resetStepsLightsFlag = true;
-            uiState.randomize2ResetTriggered = true; // Mark as triggered
-            Serial.println("Seq 2 reset by long press");
+     
+        // Check for Randomize 2 long press
+        if (uiState.randomize2WasPressed && !uiState.randomize2ResetTriggered) {
+            if (isLongPress(currentTime - uiState.randomize2PressTime)) {
+                seq2.resetAllSteps();
+                uiState.resetStepsLightsFlag = true;
+                uiState.randomize2ResetTriggered = true;
+                Serial.println("Seq 2 reset by long press");
+            }
+      }
         }
-    }
-}
+
+    
+    

@@ -19,6 +19,8 @@
 #include "src/dsp/oscillator.h"
 #include "src/dsp/delayline.h"
 #include "src/scales/scales.h"
+#include "src/dsp/wavefolder.h"
+#include "src/dsp/overdrive.h"
 
 
 // Matrix and Sequencer
@@ -44,6 +46,11 @@
 
 // OLED Display
 #include "src/OLED/oled.h"
+
+// Voices
+#include "src/voice/VoiceManager.h"
+#include "src/voice/Voice.h"
+#include "src/sequencer/Sequencer.h"
 
 // Standard libraries
 #include <Wire.h>

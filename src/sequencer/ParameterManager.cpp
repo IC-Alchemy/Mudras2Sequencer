@@ -140,7 +140,7 @@ void ParameterManager::randomizeParameters()
                 break;
             }
             case ParamId::GateLength: { // Corrected from GateSize
-                std::uniform_real_distribution<float> dist(0.1f, 0.3f);
+                std::uniform_real_distribution<float> dist(0.1f, 0.7f);
                 _tracks[i].setValue(step, dist(generator));
                 break;
             }

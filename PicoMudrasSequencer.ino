@@ -5,8 +5,8 @@
 //   GLOBAL VARIABLES
 // =======================
 UIState uiState; // Central state object for the UI
-Sequencer seq1; // Channel 1 for first sequencer
-Sequencer seq2; // Channel 2 for second sequencer
+Sequencer seq1(1); // Channel 1 for first sequencer
+Sequencer seq2(2); // Channel 2 for second sequencer
 LEDMatrix ledMatrix;
 
 // --- MIDI & Clock ---
@@ -19,32 +19,23 @@ Adafruit_MPR121 touchSensor = Adafruit_MPR121();
 constexpr float SAMPLE_RATE = 48000.0f;                                       // Compile-time constant for template parameters
 constexpr size_t MAX_DELAY_SAMPLES = static_cast<size_t>(SAMPLE_RATE * 1.8f); 
 // --- Audio & Synth ---
-daisysp::Oscillator osc1A, osc1B, osc1C, osc2A, osc2B, osc2C, lfo1, lfo2;
-daisysp::Svf highPass1, highPass2, delLowPass;
-daisysp::Adsr env1, env2;
+// New Voice System
+std::unique_ptr<VoiceManager> voiceManager;
+uint8_t leadVoiceId = 0;
+uint8_t bassVoiceId = 0;
+
+// Global effects and delay (shared between voices)
+daisysp::Oscillator lfo1, lfo2;
+daisysp::Svf delLowPass;
 daisysp::DelayLine<float, MAX_DELAY_SAMPLES> del1;
 float feedbackGain1 = 0.65f;
- float currentDelayOutputGain = 0.0f; // For smooth delay output fade
+float currentDelayOutputGain = 0.0f; // For smooth delay output fade
 OLEDDisplay display;
 float currentFeedbackGain = 0.0f; // For smooth delay feedback fade
 
-daisysp::LadderFilter filt1, filt2;
-
- // Frequency slewing variables for slide functionality
-
- struct SlewParams {
-     float currentFreq = 440.0f;
-     float targetFreq = 440.0f;
- };
-
- // Two voices (1, 2) with three slots (A, B, C) each
- SlewParams freqSlew[2][3];
-
-// Slew rate for frequency transitions (higher = faster transitions)
-constexpr float FREQ_SLEW_RATE = 0.0005f; // Adjust this value to control slide speed
-
- VoiceState voiceState1;
- VoiceState voiceState2;
+// Legacy voice states for compatibility
+VoiceState voiceState1;
+VoiceState voiceState2;
 
 // =======================
 //   OTHER CONSTANTS
@@ -60,12 +51,12 @@ float INT16_MAX_AS_FLOAT = 32767.0f;
 float INT16_MIN_AS_FLOAT = -32768.0f;
 int NUM_AUDIO_BUFFERS = 3;
 int SAMPLES_PER_BUFFER = 256;
-float OSC_DETUNE_FACTOR = .0014f;
+float OSC_DETUNE_FACTOR = .001f;
 bool resetStepsLightsFlag = true;
 float delayTarget = 48000.0f * .15f;
 float currentDelay = 48000.0f * .15f;
-float feedbackAmmount = 0.765f;
-const float FEEDBACK_FADE_RATE = 0.0001f; // Adjust for desired fade speed
+float feedbackAmmount = 0.45f; // Safer initial feedback level
+const float FEEDBACK_FADE_RATE = 0.001f; // Faster fade to prevent feedback buildup
 
 
  float lfo1LEDWaveformValue = 0.0f; // Current LFO1 waveform value for smooth LED fade (-1.0 to 1.0)
@@ -103,8 +94,7 @@ int raw_mm = 0;
 int mm = 0;
 uint8_t currentScale = 0;
 float baseFreq = 110.0f;    // Hz
-float filterfreq1 = 2000.f; // Renamed for Voice 1
-float filterfreq2 = 2000.f; // Added for Voice 2
+
 bool isClockRunning = true;
 unsigned long previousMillis = 0;
 // MIDI note tracking is now handled by MidiNoteManager in src/midi/MidiManager.h
@@ -131,24 +121,18 @@ void onSync24Callback(uint32_t tick)
 }
 void muteOscillators()
 {
-
-    osc1A.SetAmp(0.0f);
-    osc1B.SetAmp(0.0f); 
-    osc1C.SetAmp(0.0f);
-    osc2A.SetAmp(0.0f);
-    osc2B.SetAmp(0.0f);
-    osc2C.SetAmp(0.0f);
+    if (voiceManager) {
+        voiceManager->setVoiceVolume(leadVoiceId, 0.0f);
+        voiceManager->setVoiceVolume(bassVoiceId, 0.0f);
+    }
 }
+
 void unmuteOscillators()
 {
-
-    osc1A.SetAmp(.5f);
-    osc1B.SetAmp(.5f);
-    osc1C.SetAmp(.5f);
-
-    osc2A.SetAmp(.5f);
-    osc2B.SetAmp(.5f);
-    osc2C.SetAmp(1.f);
+    if (voiceManager) {
+        voiceManager->setVoiceVolume(leadVoiceId, 0.5f);
+        voiceManager->setVoiceVolume(bassVoiceId, 0.5f);
+    }
 }
 void onClockStart()
 {
@@ -191,84 +175,48 @@ static inline int16_t convertSampleToInt16(float sample)
     return static_cast<int16_t>(scaled);
 }
 
-// --- Oscillator and Envelope Initialization ---
+// --- Voice System Initialization ---
 void initOscillators()
 {
-
-    highPass1.Init(SAMPLE_RATE);
-    highPass1.SetFreq(80.f); //  this removes mud from voice1
-    highPass2.Init(SAMPLE_RATE);
-    highPass2.SetFreq(140.f); // this removes lows and mud from voice2
+    // Initialize global effects
     delLowPass.Init(SAMPLE_RATE);
     delLowPass.SetFreq(1340.f); //  delay Lowpass filter
     delLowPass.SetRes(0.19f);
     delLowPass.SetDrive(.9f);
 
-    // voice 1
-    osc1A.Init(SAMPLE_RATE);
-    osc1B.Init(SAMPLE_RATE);
-    osc1C.Init(SAMPLE_RATE);
-    filt1.Init(SAMPLE_RATE);
-    filt2.Init(SAMPLE_RATE);
-    filt1.SetFreq(1000.f);
-    filt1.SetRes(0.4f);
-    filt1.SetInputDrive(1.1f);
-    filt1.SetPassbandGain(0.23f);
-
-    env1.Init(SAMPLE_RATE);
-    env1.SetReleaseTime(.1f);
-    env1.SetAttackTime(0.04f);
-    env1.SetDecayTime(0.14f);
-    env1.SetSustainLevel(0.5f);
-
-    // voice 2
-
-    osc2A.Init(SAMPLE_RATE);
-    osc2B.Init(SAMPLE_RATE);
-
-    env2.Init(SAMPLE_RATE);
-    env2.SetAttackTime(0.015f);
-    env2.SetDecayTime(0.1f);
-    env2.SetSustainLevel(0.4f);
-    env2.SetReleaseTime(0.1f);
-
-    filt2.SetFreq(1000.f);
-    filt2.SetRes(0.22f);
-    filt2.SetInputDrive(2.f);
-    filt2.SetPassbandGain(0.14f);
     lfo1.Init(SAMPLE_RATE);
     lfo1.SetWaveform(daisysp::Oscillator::WAVE_TRI);
     lfo1.SetFreq(0.5f);
     lfo1.SetAmp(0.5f);
+    
     lfo2.Init(SAMPLE_RATE);
     lfo2.SetWaveform(daisysp::Oscillator::WAVE_TRI);
     lfo2.SetFreq(0.5f);
     lfo2.SetAmp(0.5f);
-    osc1A.SetWaveform(daisysp::Oscillator::WAVE_POLYBLEP_SAW);
-    osc1A.SetAmp(0.5f);
-    osc1B.SetWaveform(daisysp::Oscillator::WAVE_POLYBLEP_SAW);
-    osc1C.SetWaveform(daisysp::Oscillator::WAVE_POLYBLEP_SAW);
-    osc2A.SetWaveform(daisysp::Oscillator::WAVE_POLYBLEP_SQUARE);
-    osc2B.SetWaveform(daisysp::Oscillator::WAVE_POLYBLEP_SQUARE);
-    osc2B.SetPw(0.35f);
-    osc2A.SetPw(0.6f);
-    osc2C.SetWaveform(daisysp::Oscillator::WAVE_POLYBLEP_SAW);
-    osc2C.SetAmp(1.0f);
 
     del1.Init();
-
+    del1.Reset(); // Clear any garbage in delay buffer
     const float delayMs1 = 500.f;
     size_t delaySamples1 = (size_t)(delayMs1 * SAMPLE_RATE * 0.001f);
     del1.SetDelay(delaySamples1);
+    
+    // Initialize delay target to match initial delay
+    delayTarget = static_cast<float>(delaySamples1);
 
-    // Initialize frequency slewing variables using the structured approach
-    float defaultFreq = 440.0f;
-    for (int voice = 0; voice < 2; voice++) {
-        for (int osc = 0; osc < 3; osc++) {
-            freqSlew[voice][osc].currentFreq = defaultFreq;
-            freqSlew[voice][osc].targetFreq = defaultFreq;
-        }
-    }
+    // Initialize Voice Manager
+    voiceManager = std::make_unique<VoiceManager>(SAMPLE_RATE);
+    
+    // Create Lead Voice (Voice 1 replacement)
+    leadVoiceId = voiceManager->addVoice(VoicePresets::getLeadVoice());
+    
+    // Create Bass Voice (Voice 2 replacement)
+    bassVoiceId = voiceManager->addVoice(VoicePresets::getBassVoice());
+    
+    // Attach sequencers to voices
+    voiceManager->attachSequencer(leadVoiceId, &seq1);
+    voiceManager->attachSequencer(bassVoiceId, &seq2);
+    
+    Serial.println("Voice system initialized with Lead and Bass voices");
 }
 
 // Long press detection is now handled by ButtonManager module
@@ -434,84 +382,32 @@ void updateVoiceParameters(
         }
     }
 
-    // Update oscillator frequencies when gate is active or during editing
+    // Update voice parameters using the new voice system
     if (!updateGate || (gate && *gate))
     {
+        uint8_t voiceId = isVoice2 ? bassVoiceId : leadVoiceId;
+        
+        // Calculate base frequency for the voice
         int noteIndex = state.note;
-   int harmony = 7;
-
-        if (!isVoice2)
-        {
-            // Voice 1 updates - use consistent base note of 48
-            float freq = daisysp::mtof(scale[currentScale][noteIndex] + 48 + state.octave);
-           float freqB = freq + (freq * OSC_DETUNE_FACTOR);
-           float freqC = freq - (freq * OSC_DETUNE_FACTOR);
-
-            if (state.slide)
-            {
-                // Slide mode: set target frequencies for smooth interpolation
-                freqSlew[0][0].targetFreq = freq;  // Voice 1, Oscillator A
-               freqSlew[0][1].targetFreq = freqB;  // Voice 1, Oscillator B
-               freqSlew[0][2].targetFreq = freqC;  // Voice 1, Oscillator C
-            }
-            else
-            {
-                // Non-slide mode: set frequencies directly and update current values
-                osc1A.SetFreq(freq);
-             osc1B.SetFreq(freqB);
-               osc1C.SetFreq(freqC);
-                freqSlew[0][0].currentFreq = freq;  // Voice 1, Oscillator A
-                freqSlew[0][1].currentFreq = freqB;  // Voice 1, Oscillator B
-            freqSlew[0][2].currentFreq = freqC;  // Voice 1, Oscillator C
-                freqSlew[0][0].targetFreq = freq;   // Voice 1, Oscillator A
-                freqSlew[0][1].targetFreq = freqB;   // Voice 1, Oscillator B
-                freqSlew[0][2].targetFreq = freqC;   // Voice 1, Oscillator C
-            }
-        }
-        else
-        {
-            // Voice 2 updates - use base notes of 48 and 36
-            float freq1 = daisysp::mtof(scale[currentScale][noteIndex] + 48 + state.octave);
-            float freq2 = daisysp::mtof(scale[currentScale][noteIndex+harmony] + 48 + state.octave);
-         float freq3 = daisysp::mtof(scale[currentScale][noteIndex] + 36 + state.octave);
-
-            if (state.slide)
-            {
-                // Slide mode: set target frequencies for smooth interpolation
-                freqSlew[1][0].targetFreq = freq1;  // Voice 2, Oscillator A
-                freqSlew[1][1].targetFreq = freq2;  // Voice 2, Oscillator B
-              freqSlew[1][2].targetFreq = freq3;  // Voice 2, Oscillator C
-            }
-            else
-            {
-                // Non-slide mode: set frequencies directly and update current values
-                osc2A.SetFreq(freq1);
-                osc2B.SetFreq(freq2);
-                osc2C.SetFreq(freq3);
-                freqSlew[1][0].currentFreq = freq1;  // Voice 2, Oscillator A
-                freqSlew[1][1].currentFreq = freq2;  // Voice 2, Oscillator B
-               freqSlew[1][2].currentFreq = freq3;  // Voice 2, Oscillator C
-                freqSlew[1][0].targetFreq = freq1;   // Voice 2, Oscillator A
-                freqSlew[1][1].targetFreq = freq2;   // Voice 2, Oscillator B
-             freqSlew[1][2].targetFreq = freq3;   // Voice 2, Oscillator C
-            }
-        }
+        float baseFreq = daisysp::mtof(scale[currentScale][noteIndex] + 48 + state.octave);
+        
+        // Update voice frequency through VoiceManager
+        voiceManager->setVoiceFrequency(voiceId, baseFreq);
+        
+        // Handle slide/portamento
+        voiceManager->setVoiceSlide(voiceId, state.slide);
     }
 
-    // Always update envelope parameters regardless of gate state
-    daisysp::Adsr &env = isVoice2 ? env2 : env1;
-    applyEnvelopeParameters(state, env, isVoice2 ? 2 : 1);
-
-    // Always update filter frequency for smooth parameter changes
-     float &filterFreq = isVoice2 ? filterfreq2 : filterfreq1;
-    filterFreq = calculateFilterFrequency(state.filter);
+    // Update voice parameters through VoiceManager
+    uint8_t voiceId = isVoice2 ? bassVoiceId : leadVoiceId;
+    voiceManager->updateVoiceState(voiceId, state);
 
     // Send MIDI CC messages for parameter changes
-    uint8_t voiceId = isVoice2 ? 1 : 0;
-    midiNoteManager.updateParameterCC(voiceId, ParamId::Filter, state.filter);
-    midiNoteManager.updateParameterCC(voiceId, ParamId::Attack, state.attack);
-    midiNoteManager.updateParameterCC(voiceId, ParamId::Decay, state.decay);
-    midiNoteManager.updateParameterCC(voiceId, ParamId::Octave, state.octave);
+    uint8_t midiVoiceId = isVoice2 ? 1 : 0;
+    midiNoteManager.updateParameterCC(midiVoiceId, ParamId::Filter, state.filter);
+    midiNoteManager.updateParameterCC(midiVoiceId, ParamId::Attack, state.attack);
+    midiNoteManager.updateParameterCC(midiVoiceId, ParamId::Decay, state.decay);
+    midiNoteManager.updateParameterCC(midiVoiceId, ParamId::Octave, state.octave);
 }
 
 /**
@@ -584,23 +480,24 @@ void fill_audio_buffer(audio_buffer_t *buffer)
     float sigout;
     float slew = 0.0001f; // Slew rate for delay time smoothing
     float output;
+    
     // Determine the target gains based on delayOn state
-
-    float targetDelayOutputGain = uiState.delayOn ? 1.0f : 0.0f; // 1.0f for full output, 0.0f for no output
+    float targetDelayOutputGain = uiState.delayOn ? 1.0f : 0.0f;
     float targetFeedbackGain = uiState.delayOn ? feedbackAmmount : 0.0f;
+    
+    // Smooth parameters once per buffer to reduce CPU load
+    currentFeedbackGain = delayTimeSmoothing(currentFeedbackGain, targetFeedbackGain, FEEDBACK_FADE_RATE);
+    currentDelayOutputGain = delayTimeSmoothing(currentDelayOutputGain, targetDelayOutputGain, FEEDBACK_FADE_RATE);
+    currentDelay = delayTimeSmoothing(currentDelay, delayTarget, slew);
+    
+    // Set delay time once per buffer
+    del1.SetDelay(currentDelay);
+    
     for (int i = 0; i < N; ++i)
     {
-
         lfo1Output = lfo1.Process();
         lfo2Output = lfo2.Process();
-
-        // Capture actual LFO output values for LED synchronization
-        // Smooth the currentFeedbackGain towards its target
-        currentFeedbackGain = delayTimeSmoothing(currentFeedbackGain, targetFeedbackGain, FEEDBACK_FADE_RATE);
-        // Smooth the currentDelayOutputGain towards its target
-        currentDelayOutputGain = delayTimeSmoothing(currentDelayOutputGain, targetDelayOutputGain, FEEDBACK_FADE_RATE);
-        // Apply smoothing to delay time
-        currentDelay = delayTimeSmoothing(currentDelay, delayTarget, slew); // Fixed: added slew argument
+        
         // Sample every 64 samples to reduce overhead while maintaining visual accuracy
         if (i % 64 == 0)
         {
@@ -608,91 +505,31 @@ void fill_audio_buffer(audio_buffer_t *buffer)
             lfo2LEDWaveformValue = lfo2Output;
         }
 
-        // Frequency slewing for slide functionality
-        // Voice 1 frequency slewing
-        if (voiceState1.slide)
-        {
-            // Exponential slewing for smooth frequency transitions
-            freqSlew[0][0].currentFreq += (freqSlew[0][0].targetFreq - freqSlew[0][0].currentFreq) * FREQ_SLEW_RATE;
-           freqSlew[0][1].currentFreq += (freqSlew[0][1].targetFreq - freqSlew[0][1].currentFreq) * FREQ_SLEW_RATE;
-            freqSlew[0][2].currentFreq += (freqSlew[0][2].targetFreq - freqSlew[0][2].currentFreq) * FREQ_SLEW_RATE;
-            osc1A.SetFreq(freqSlew[0][0].currentFreq);
-            osc1B.SetFreq(freqSlew[0][1].currentFreq);
-           osc1C.SetFreq(freqSlew[0][2].currentFreq);
-        }
+        // Process all voices efficiently (voice states are updated by sequencer callbacks)
+        finalvoice = voiceManager->processAllVoices();
 
-        // Voice 2 frequency slewing
-        if (voiceState2.slide)
-        {
-            // Exponential slewing for smooth frequency transitions
-            freqSlew[1][0].currentFreq += (freqSlew[1][0].targetFreq - freqSlew[1][0].currentFreq) * FREQ_SLEW_RATE;
-            freqSlew[1][1].currentFreq += (freqSlew[1][1].targetFreq - freqSlew[1][1].currentFreq) * FREQ_SLEW_RATE;
-           freqSlew[1][2].currentFreq += (freqSlew[1][2].targetFreq - freqSlew[1][2].currentFreq) * FREQ_SLEW_RATE;
-            osc2A.SetFreq(freqSlew[1][0].currentFreq);
-            osc2B.SetFreq(freqSlew[1][1].currentFreq);
-          osc2C.SetFreq(freqSlew[1][2].currentFreq);
-        }
+        // Read from delay line
+        delout = del1.Read();
+        
+        // Calculate feedback signal with proper gain staging
+        float feedbackSignal = delout * currentFeedbackGain;
+        
+        // Apply low-pass filtering to feedback to prevent harsh artifacts
+        delLowPass.Process(feedbackSignal);
+        float filteredFeedback = delLowPass.Low();
+        
+        // Write to delay line: dry input + filtered feedback
+        // Clamp feedback to prevent runaway
+        filteredFeedback = std::max(-1.0f, std::min(filteredFeedback, 1.0f));
+        del1.Write(finalvoice + filteredFeedback);
+        
+        // Mix dry and wet signals
+        output = finalvoice + (delout * currentDelayOutputGain);
+        
+        // Soft clipping to prevent harsh distortion
+        output = std::tanh(output * 0.7f);
 
-        // Process voice 1
-        // Check for envelope retrigger request
-        if (voiceState1.retrigger)
-        {
-            env1.Retrigger(false);         // Retrigger envelope without hard reset
-            voiceState1.retrigger = false; // Clear the flag
-        }
-
-        // Get envelope state using public methods of sequencer 1
-        float current_filter_env_value1 = env1.Process(GATE1);
-        filt1.SetFreq(filterfreq1 * current_filter_env_value1 );
-       
-        float voice1 = (osc1A.Process() + osc1B.Process() + osc1C.Process()) *.6f;
-
-
-        float filtered_signal1 = filt1.Process(voice1);
-                        highPass1.Process(filtered_signal1);
-
-        float final_voice1 = highPass1.High() * current_filter_env_value1;
-
-
-        // Process voice 2
-        // Check for envelope retrigger request
-        if (voiceState2.retrigger)
-        {
-            env2.Retrigger(false);         // Retrigger envelope without hard reset
-            voiceState2.retrigger = false; // Clear the flag
-        }
-
-        // Get envelope state using public methods of sequencer 2
-        float current_filter_env_value2 = env2.Process(GATE2);
-        filt2.SetFreq((filterfreq2 * current_filter_env_value2) );
-
-        float voice2 = (osc2A.Process() + osc2B.Process()+osc2C.Process()*2.f ) *.6f;
-        float filtered_signal2 = filt2.Process(voice2) ; 
-
-        highPass2.Process(filtered_signal2);
-
-
-        float final_voice2 = highPass2.High() * current_filter_env_value2;
-
-        finalvoice = (final_voice1 + final_voice2) * .5f;
-
-        // Delay processing (always active, feedback controlled by currentFeedbackGain)
-        del1.SetDelay(currentDelay);  // Set delay time (smoothed)
-        delout = del1.Read();         
-        sigout = (delout * currentDelayOutputGain) + finalvoice; // Mix dry input with current delay output (faded) for final audio output
-
-        // Calculate feedback signal using the smoothed gain
-        float feedbackSignal = delout * currentFeedbackGain; // Apply smoothed feedback gain here
-        delLowPass.Process(feedbackSignal*.85f);                  // Filter the feedback signal
-
-        // Write to the delay line: dry input + filtered feedback
-        float signalToWrite = finalvoice + delLowPass.Low();
-        del1.Write(signalToWrite); // Write to delay line
-
-        output = sigout; // Final output is the mixed signal
-
-        // Output mixing
-        // Output mixing
+        // Output to stereo channels
         out[2 * i + 0] = convertSampleToInt16(output);
         out[2 * i + 1] = convertSampleToInt16(output);
     }
@@ -790,7 +627,7 @@ void setup1()
 
         // Configure MPR121 touch thresholds.
         // Using the original, more conservative thresholds.
-        // touchSensor.setThresholds(155, 55); // touch, release thresholds
+         touchSensor.setThresholds(55, 33); // touch, release thresholds
         // Serial.println("MPR121 thresholds configured to 155/55");
     }
 
@@ -803,12 +640,7 @@ void setup1()
     Matrix_init(&touchSensor);
     Serial.println("Matrix initialized");
     
-    // Test touch sensor immediately
-    uint16_t testTouch = touchSensor.touched();
-    Serial.print("Initial touch test: 0x");
-    if (testTouch < 0x100) Serial.print("0");
-    if (testTouch < 0x10) Serial.print("0");
-    Serial.println(testTouch, HEX);
+
     
     // Force a matrix scan to test the system
     Serial.println("Forcing initial matrix scan...");
@@ -862,13 +694,10 @@ void loop()
 // --- Optimized LED and UI Update Loop (Core1) ---
 void loop1()
 {
-    static bool firstRun = true;
-    if (firstRun) {
-        Serial.println("loop1 started - matrix scanning active");
-        firstRun = false;
-    }
-    
+   
     usb_midi.read();
+    // Trigger immediate long-press resets for Randomize buttons
+    pollUIHeldButtons(uiState, seq1, seq2);
 
     unsigned long currentMillis = millis();
 
@@ -930,7 +759,7 @@ void loop1()
 
 
     static unsigned long lastLEDUpdate = 0;
-    const unsigned long LED_UPDATE_INTERVAL = 20; // 20ms interval
+    const unsigned long LED_UPDATE_INTERVAL = 2; // 20ms interval
 
     uint16_t currtouched = touchSensor.touched();
     
