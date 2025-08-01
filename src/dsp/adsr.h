@@ -26,6 +26,7 @@ enum
     ADSR_SEG_IDLE    = 0,
     ADSR_SEG_ATTACK  = 1,
     ADSR_SEG_DECAY   = 2,
+    ADSR_SEG_SUSTAIN = 3,
     ADSR_SEG_RELEASE = 4
 };
 

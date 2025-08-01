@@ -509,23 +509,8 @@ void fill_audio_buffer(audio_buffer_t *buffer)
         // Process all voices efficiently (voice states are updated by sequencer callbacks)
         finalvoice = voiceManager->processAllVoices();
 
-        // Read from delay line
-        delout = del1.Read();
-        
-        // Calculate feedback signal with proper gain staging
-        float feedbackSignal = delout * currentFeedbackGain;
-        
-        // Apply low-pass filtering to feedback to prevent harsh artifacts
-        delLowPass.Process(feedbackSignal);
-        float filteredFeedback = delLowPass.Low();
-        
-        // Write to delay line: dry input + filtered feedback
-        // Clamp feedback to prevent runaway
-        filteredFeedback = std::max(-1.0f, std::min(filteredFeedback, .9f));
-        del1.Write(finalvoice + filteredFeedback);
-        
-        // Mix dry and wet signals
-        output = finalvoice + (delout * currentDelayOutputGain);
+        // Process delay effect
+        output = processDelayEffect(finalvoice);
         
      
 
@@ -535,6 +520,28 @@ void fill_audio_buffer(audio_buffer_t *buffer)
     }
 
     buffer->sample_count = N;
+}
+
+// --- Delay Effect Processing ---
+float processDelayEffect(float inputSignal)
+{
+    // Read from delay line
+    float delout = del1.Read();
+    
+    // Calculate feedback signal with proper gain staging
+    float feedbackSignal = delout * currentFeedbackGain;
+    
+    // Apply low-pass filtering to feedback to prevent harsh artifacts
+    delLowPass.Process(feedbackSignal);
+    float filteredFeedback = delLowPass.Low();
+    
+    // Write to delay line: dry input + filtered feedback
+    // Clamp feedback to prevent runaway
+    filteredFeedback = std::max(-1.0f, std::min(filteredFeedback, .9f));
+    del1.Write(inputSignal + filteredFeedback);
+    
+    // Mix dry and wet signals
+    return inputSignal + (delout * currentDelayOutputGain);
 }
 
 

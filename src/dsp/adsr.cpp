@@ -91,7 +91,11 @@ float Adsr::Process(bool gate) {
     D0 = releaseD0_;
 
   // Set target level based on current mode
-  float target = mode_ == ADSR_SEG_DECAY ? sus_level_ : -0.01f;
+  float target = -0.01f; // Default target for release
+  if (mode_ == ADSR_SEG_DECAY)
+    target = sus_level_;
+  else if (mode_ == ADSR_SEG_SUSTAIN)
+    target = sus_level_;
 
   // Process ADSR based on current mode
   switch (mode_) {
@@ -114,9 +118,13 @@ float Adsr::Process(bool gate) {
     x_ += D0 * (sus_level_ - x_);
     out = x_;
     if (fabs(x_ - sus_level_) < 0.0001f) {
-      // If output is close enough to sustain level, move to release stage
-      mode_ = ADSR_SEG_RELEASE; // Move to release stage
+      // If output is close enough to sustain level, move to sustain stage
+      mode_ = ADSR_SEG_SUSTAIN;
     }
+    break;
+  case ADSR_SEG_SUSTAIN:
+    // Hold at sustain level until gate goes off
+    out = sus_level_;
     break;
   case ADSR_SEG_RELEASE:
     // Apply decay or release curve

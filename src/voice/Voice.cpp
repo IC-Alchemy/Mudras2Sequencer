@@ -146,6 +146,9 @@ float Voice::process() {
 void Voice::updateParameters(const VoiceState& newState) {
     state = newState;
     
+    // Update gate state to sync with sequencer
+    gate = state.gate;
+    
     // Apply envelope parameters
     applyEnvelopeParameters();
     
