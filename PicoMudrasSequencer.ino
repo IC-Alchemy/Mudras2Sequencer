@@ -220,6 +220,26 @@ void initOscillators()
     Serial.println("Voice system initialized with Lead and Bass voices");
 }
 
+// Apply voice preset to the specified voice
+void applyVoicePreset(uint8_t voiceNumber, uint8_t presetIndex) {
+    if (presetIndex >= VoicePresets::getPresetCount()) {
+        Serial.println("Invalid preset index");
+        return;
+    }
+    
+    VoiceConfig config = VoicePresets::getPresetConfig(presetIndex);
+    uint8_t voiceId = (voiceNumber == 1) ? leadVoiceId : bassVoiceId;
+    
+    if (voiceManager->setVoiceConfig(voiceId, config)) {
+        Serial.print("Applied preset '");
+        Serial.print(VoicePresets::getPresetName(presetIndex));
+        Serial.print("' to Voice ");
+        Serial.println(voiceNumber);
+    } else {
+        Serial.println("Failed to apply voice preset");
+    }
+}
+
 // Long press detection is now handled by ButtonManager module
 // isVoice2Mode is now managed by ButtonManager module
 const uint8_t VOICE2_LED_OFFSET = 32;                        // Starting LED index for Voice 2

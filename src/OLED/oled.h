@@ -74,6 +74,11 @@ private:
      */
     String formatParameterValue(ParamId paramId, float value);
     
+    /**
+     * @brief Display settings menu
+     * @param uiState Current UI state containing settings information
+     */
+    void displaySettingsMenu(const UIState& uiState);
 
 };
 

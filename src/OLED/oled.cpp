@@ -1,4 +1,5 @@
 #include "oled.h"
+#include "../voice/Voice.h"
 #include "../../includes.h"
 #include "../sequencer/SequencerDefs.h"
 #include "../sequencer/ShuffleTemplates.h"
@@ -51,6 +52,13 @@ void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Se
     // Draw a border for a more professional look
     display.drawRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, SH110X_WHITE);
 
+    // Handle settings mode display
+    if (uiState.settingsMode) {
+        displaySettingsMenu(uiState);
+        display.display();
+        return;
+    }
+
     const ParamButtonMapping* heldParam = getHeldParameterButton(uiState);
 
     if (heldParam != nullptr) {
@@ -78,10 +86,9 @@ void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Se
         // Horizontal line under header
         display.drawFastHLine(5, 14, SCREEN_WIDTH - 10, SH110X_WHITE);
         
-        // Scale section with icon
+        // Scale section 
+      
         display.setCursor(5, 20);
-      //  display.print("\x10"); // Musical note symbol
-        display.setCursor(15, 20);
         display.print("Scale:");
         
         display.setCursor(55, 20);
@@ -91,10 +98,9 @@ void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Se
         // Separator line
        // display.drawFastHLine(10, 30, SCREEN_WIDTH - 20, SH110X_WHITE);
         
-        // Shuffle section with icon
+        // Shuffle section
+     
         display.setCursor(5, 36);
-     //   display.print("\x7E"); // Tilde symbol for shuffle
-        display.setCursor(15, 36);
         display.print("Shuffle:");
         
         display.setCursor(65, 36);
@@ -210,5 +216,102 @@ String OLEDDisplay::formatParameterValue(ParamId paramId, float value) {
             
         default:
             return String(value, 2);
+    }
+}
+
+void OLEDDisplay::displaySettingsMenu(const UIState& uiState) {
+    display.setTextSize(1);
+    
+    if (uiState.inPresetSelection) {
+        // Enhanced preset selection with cycling interface
+        int currentPresetIndex = (uiState.settingsMenuIndex == 0) ? 
+                               uiState.voice1PresetIndex : uiState.voice2PresetIndex;
+        
+        // Header with voice info
+        display.setCursor(5, 5);
+        display.print("VOICE ");
+        display.print(uiState.settingsMenuIndex + 1);
+        display.print(" PRESET");
+        
+        // Draw separator line
+        display.drawFastHLine(5, 14, SCREEN_WIDTH - 10, SH110X_WHITE);
+        
+        // Current preset - large and centered
+        display.setTextSize(2);
+        const char* currentPresetName = VoicePresets::getPresetName(currentPresetIndex);
+        int textWidth = strlen(currentPresetName) * 12; // Approximate width for size 2
+        int centerX = (SCREEN_WIDTH - textWidth) / 2;
+        display.setCursor(centerX, 20);
+        display.print(currentPresetName);
+        
+        // Navigation indicators
+        display.setTextSize(1);
+        
+        // Previous preset (if available)
+        if (currentPresetIndex > 0) {
+            display.setCursor(5, 45);
+            display.print("< ");
+            display.print(VoicePresets::getPresetName(currentPresetIndex - 1));
+        }
+        
+        // Next preset (if available)
+        if (currentPresetIndex < VoicePresets::getPresetCount() - 1) {
+            const char* nextPresetName = VoicePresets::getPresetName(currentPresetIndex + 1);
+            int nextTextWidth = strlen(nextPresetName) * 6 + 12; // 6 pixels per char + "> " width
+            display.setCursor(SCREEN_WIDTH - nextTextWidth, 45);
+            display.print(nextPresetName);
+            display.print(" >");
+        }
+        
+        // Preset counter at bottom
+        display.setCursor(5, 56);
+        display.print(currentPresetIndex + 1);
+        display.print("/");
+        display.print(VoicePresets::getPresetCount());
+        
+        // Instructions
+        display.setCursor(SCREEN_WIDTH - 84, 56); // Right-aligned
+        display.print("BTN1-6:SEL BTN8:OK");
+        
+    } else {
+        // Enhanced main settings menu
+        display.setCursor(5, 5);
+        display.setTextSize(1);
+        display.print("SETTINGS MENU");
+        
+        // Draw separator line
+        display.drawFastHLine(5, 14, SCREEN_WIDTH - 10, SH110X_WHITE);
+        
+        // Voice configurations with better visual hierarchy
+        for (int i = 0; i < 2; i++) {
+            int yPos = 20 + (i * 20);
+            
+            // Selection indicator
+            if (uiState.settingsMenuIndex == i) {
+                // Draw selection box
+                display.drawRect(2, yPos - 2, SCREEN_WIDTH - 4, 18, SH110X_WHITE);
+                display.setCursor(5, yPos);
+                display.print("> ");
+            } else {
+                display.setCursor(5, yPos);
+                display.print("  ");
+            }
+            
+            // Voice label
+            display.print("VOICE ");
+            display.print(i + 1);
+            
+            // Current preset name
+            display.setCursor(5, yPos + 8);
+            const char* presetName = (i == 0) ? 
+                VoicePresets::getPresetName(uiState.voice1PresetIndex) :
+                VoicePresets::getPresetName(uiState.voice2PresetIndex);
+            display.print("Preset: ");
+            display.print(presetName);
+        }
+        
+        // Instructions at bottom
+        display.setCursor(5, 56);
+        display.print("BTN1-2:SEL  BTN8:EDIT");
     }
 }

@@ -6,7 +6,7 @@
 #include <cmath>
 
 // Constants
-static constexpr float FREQ_SLEW_RATE = 0.0005f; // Slide speed
+static constexpr float FREQ_SLEW_RATE = 0.00035f; // Slide speed
 static constexpr float BASE_FREQ = 110.0f; // Base frequency for note calculations
 
 Voice::Voice(uint8_t id, const VoiceConfig& cfg) 
@@ -153,7 +153,7 @@ void Voice::updateParameters(const VoiceState& newState) {
     applyEnvelopeParameters();
     
     // Calculate and set filter frequency
-    filterFrequency = daisysp::fmap(state.filter, 100.0f, 6710.0f, daisysp::Mapping::EXP);
+    filterFrequency = daisysp::fmap(state.filter, 150.0f, 11710.0f, daisysp::Mapping::EXP);
     
     // Update oscillator frequencies
     updateOscillatorFrequencies();
@@ -207,7 +207,7 @@ void Voice::applyEnvelopeParameters() {
     float release = decay; // Use decay for release in this implementation
     
     envelope.SetAttackTime(attack);
-    envelope.SetDecayTime(0.1f + (release * 0.75f));
+    envelope.SetDecayTime(0.05f+(release * 0.5f));
     envelope.SetReleaseTime(release);
 }
 
@@ -260,17 +260,17 @@ namespace VoicePresets {
         config.oscWaveforms[0] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
         config.oscWaveforms[1] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
         config.oscWaveforms[2] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
-        config.oscAmplitudes[0] = 1.0f;
-        config.oscAmplitudes[1] = 1.0f;
-        config.oscAmplitudes[2] = 1.0f;
+        config.oscAmplitudes[0] = .33f;
+        config.oscAmplitudes[1] = .33f;
+        config.oscAmplitudes[2] = .33f;
         config.oscDetuning[0] = 0.0f;
         config.oscDetuning[1] = 0.001f; // Slight detune
         config.oscDetuning[2] = -0.001f; // Slight detune opposite
         
-        config.filterRes = 0.4f;
-        config.filterDrive = 1.1f;
+        config.filterRes = 0.33f;
+        config.filterDrive = 2.1f;
         config.filterPassbandGain = 0.23f;
-        config.highPassFreq = 80.0f;
+        config.highPassFreq = 140.0f;
         
         config.hasOverdrive = false;
         config.hasWavefolder = false;
@@ -292,15 +292,17 @@ namespace VoicePresets {
         config.oscWaveforms[0] = daisysp::Oscillator::WAVE_POLYBLEP_SQUARE;
         config.oscWaveforms[1] = daisysp::Oscillator::WAVE_POLYBLEP_SQUARE;
         config.oscWaveforms[2] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
-        config.oscAmplitudes[0] = 0.5f;
-        config.oscAmplitudes[1] = 0.5f;
-        config.oscAmplitudes[2] = 2.0f;
+        config.oscAmplitudes[0] = 0.3f;
+        config.oscAmplitudes[1] = 0.3f;
+        config.oscAmplitudes[2] = .6f;
         config.oscPulseWidth[0] = 0.6f;
         config.oscPulseWidth[1] = 0.35f;
-        
+          config.oscDetuning[0] = 0.0f;
+        config.oscDetuning[2] = 12.0f;
+        config.oscPulseWidth[1] = 0.3f; // Narrow pulse for bass
         config.filterRes = 0.22f;
-        config.filterDrive = 2.0f;
-        config.filterPassbandGain = 0.14f;
+        config.filterDrive = 3.0f;
+        config.filterPassbandGain = 0.24f;
         config.highPassFreq = 140.0f;
         
         config.hasOverdrive = false;
@@ -316,18 +318,16 @@ namespace VoicePresets {
     
     VoiceConfig getBassVoice() {
         VoiceConfig config;
-        config.oscillatorCount = 2;
+        config.oscillatorCount = 3;
         config.oscWaveforms[0] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
-        config.oscWaveforms[1] = daisysp::Oscillator::WAVE_POLYBLEP_SQUARE;
-        config.oscAmplitudes[0] = 1.0f;
-        config.oscAmplitudes[1] = 0.7f;
-        config.oscDetuning[0] = 0.0f;
-        config.oscDetuning[1] = -12.0f; // One octave down
-        config.oscPulseWidth[1] = 0.3f; // Narrow pulse for bass
+        config.oscWaveforms[1] = daisysp::Oscillator::WAVE_POLYBLEP_TRI;
+        config.oscAmplitudes[0] = .4f;
+        config.oscAmplitudes[1] = 1.f;
+        config.oscDetuning[2] = -12.0f; // One octave down
         
         config.filterRes = 0.4f;
-        config.filterDrive = 1.5f;
-        config.filterPassbandGain = 0.3f;
+        config.filterDrive = 2.f;
+        config.filterPassbandGain = 0.22f;
         config.highPassFreq = 40.0f; // Lower for bass
         
         config.hasOverdrive = false;
@@ -347,21 +347,21 @@ namespace VoicePresets {
         config.oscWaveforms[0] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
         config.oscWaveforms[1] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
         config.oscWaveforms[2] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
-        config.oscAmplitudes[0] = 1.0f;
-        config.oscAmplitudes[1] = 0.8f;
-        config.oscAmplitudes[2] = 0.6f;
+        config.oscAmplitudes[0] = .55f;
+        config.oscAmplitudes[1] = .33f;
+        config.oscAmplitudes[2] = 0.33f;
         config.oscDetuning[0] = 0.0f;
-        config.oscDetuning[1] = 7.0f;  // Perfect fifth
-        config.oscDetuning[2] = -5.0f; // Slight detune
+        config.oscDetuning[1] = 0.0002f;  // Perfect fifth
+        config.oscDetuning[2] = 0.0002f; // Slight detune
         
-        config.filterRes = 0.3f;
-        config.filterDrive = 2.5f;
-        config.filterPassbandGain = 0.15f;
-        config.highPassFreq = 100.0f;
+        config.filterRes = 0.45f;
+        config.filterDrive =3.5f;
+        config.filterPassbandGain = 0.25f;
+        config.highPassFreq = 120.0f;
         
-        config.hasOverdrive = false;
+        config.hasOverdrive = true;
         config.hasWavefolder = false;
-        config.overdriveAmount = 0.1f;
+        config.overdriveAmount = 0.2f;
         config.wavefolderGain = 1.0f;
         
         config.defaultAttack = 0.02f;
@@ -378,17 +378,17 @@ namespace VoicePresets {
         config.oscWaveforms[0] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
         config.oscWaveforms[1] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
         config.oscWaveforms[2] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
-        config.oscAmplitudes[0] = 0.7f;
-        config.oscAmplitudes[1] = 0.7f;
-        config.oscAmplitudes[2] = 0.7f;
+        config.oscAmplitudes[0] = 0.4f;
+        config.oscAmplitudes[1] = 0.4f;
+        config.oscAmplitudes[2] = 0.4f;
         config.oscDetuning[0] = 0.0f;
         config.oscDetuning[1] = 12.0f;  // One octave up
-        config.oscDetuning[2] = 19.0f;  // Perfect fifth above octave
+        config.oscDetuning[2] = 7.0f;  // Perfect fifth above octave
         
-        config.filterRes = 0.3f;
+        config.filterRes = 0.15f;
         config.filterDrive = 0.8f;
-        config.filterPassbandGain = 0.4f;
-        config.highPassFreq = 60.0f;
+        config.filterPassbandGain = 0.13f;
+        config.highPassFreq = 160.0f;
         
         config.hasOverdrive = false;
         config.hasWavefolder = false;
@@ -398,7 +398,7 @@ namespace VoicePresets {
         config.defaultSustain = 0.8f;
         config.defaultRelease = 1.0f; // Long release
         
-        config.outputLevel = 0.6f; // Lower level for pad
+       // config.outputLevel = 0.6f; // Lower level for pad
         
         return config;
     }
@@ -406,22 +406,22 @@ namespace VoicePresets {
     VoiceConfig getPercussionVoice() {
         VoiceConfig config;
         config.oscillatorCount = 2;
-        config.oscWaveforms[0] = daisysp::Oscillator::WAVE_POLYBLEP_SQUARE;
-        config.oscWaveforms[1] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
-        config.oscAmplitudes[0] = 1.0f;
-        config.oscAmplitudes[1] = 0.5f;
+        config.oscWaveforms[0] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
+        config.oscWaveforms[1] = daisysp::Oscillator::WAVE_POLYBLEP_SQUARE;
+        config.oscAmplitudes[0] = .5f;
+        config.oscAmplitudes[1] = .5f;
         config.oscDetuning[0] = 0.0f;
         config.oscDetuning[1] = 7.0f; // Fifth for metallic sound
         config.oscPulseWidth[0] = 0.1f; // Very narrow pulse
         
-        config.filterRes = 0.9f; // High resonance
+        config.filterRes = 0.55f; // High resonance
         config.filterDrive = 3.0f;
-        config.filterPassbandGain = 0.1f;
-        config.highPassFreq = 200.0f; // High-pass for percussion
+        config.filterPassbandGain = 0.33f;
+        config.highPassFreq = 144.0f; // High-pass for percussion
         
-        config.hasOverdrive = false;
+        config.hasOverdrive = true;
         config.hasWavefolder = false;
-        config.overdriveAmount = 0.6f;
+        config.overdriveAmount = 0.2f;
         config.wavefolderGain = 3.0f;
         
         config.defaultAttack = 0.001f; // Very fast attack
@@ -430,5 +430,40 @@ namespace VoicePresets {
         config.defaultRelease = 0.1f;  // Short release
         
         return config;
+    }
+
+    // Preset name mapping for settings menu
+    static const char* VOICE_PRESET_NAMES[] = {
+        "Analog",
+        "Digital", 
+        "Bass",
+        "Lead",
+        "Pad",
+        "Percussion"
+    };
+
+    static const uint8_t VOICE_PRESET_COUNT = 6;
+
+    const char* getPresetName(uint8_t presetIndex) {
+        if (presetIndex < VOICE_PRESET_COUNT) {
+            return VOICE_PRESET_NAMES[presetIndex];
+        }
+        return "Unknown";
+    }
+
+    VoiceConfig getPresetConfig(uint8_t presetIndex) {
+        switch(presetIndex) {
+            case 0: return getAnalogVoice();
+            case 1: return getDigitalVoice();
+            case 2: return getBassVoice();
+            case 3: return getLeadVoice();
+            case 4: return getPadVoice();
+            case 5: return getPercussionVoice();
+            default: return getAnalogVoice(); // Default fallback
+        }
+    }
+
+    uint8_t getPresetCount() {
+        return VOICE_PRESET_COUNT;
     }
 }

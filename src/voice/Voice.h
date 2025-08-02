@@ -302,4 +302,24 @@ namespace VoicePresets {
      * @return VoiceConfig Percussion voice configuration
      */
     VoiceConfig getPercussionVoice();
+    
+    /**
+     * @brief Get preset name by index
+     * @param presetIndex Index of the preset (0-5)
+     * @return const char* Name of the preset
+     */
+    const char* getPresetName(uint8_t presetIndex);
+    
+    /**
+     * @brief Get preset configuration by index
+     * @param presetIndex Index of the preset (0-5)
+     * @return VoiceConfig Configuration for the preset
+     */
+    VoiceConfig getPresetConfig(uint8_t presetIndex);
+    
+    /**
+     * @brief Get total number of available presets
+     * @return uint8_t Number of presets
+     */
+    uint8_t getPresetCount();
 }

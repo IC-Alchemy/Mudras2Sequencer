@@ -53,6 +53,16 @@ struct UIState {
 
    // --- Debounce for Slide Mode Toggle ---
    unsigned long lastSlideModeToggleTime = 0;
+
+   // --- Settings Mode State ---
+   bool settingsMode = false;
+   uint8_t settingsMenuIndex = 0;      // 0-7 for 8 menu items
+   uint8_t settingsSubMenuIndex = 0;   // For preset selection
+   bool inPresetSelection = false;
+   uint8_t voice1PresetIndex = 3;      // Default to Lead Voice
+   uint8_t voice2PresetIndex = 2;      // Default to Bass Voice
+   unsigned long playStopPressTime = 0;
+   bool playStopWasPressed = false;
 };
 
 #endif // UI_STATE_H
