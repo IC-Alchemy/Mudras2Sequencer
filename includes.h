@@ -16,6 +16,7 @@
 #include "src/dsp/adsr.h"
 #include "src/dsp/ladder.h"
 #include "src/dsp/svf.h"
+#include "src/dsp/particle.h"
 #include "src/dsp/oscillator.h"
 #include "src/dsp/delayline.h"
 #include "src/scales/scales.h"

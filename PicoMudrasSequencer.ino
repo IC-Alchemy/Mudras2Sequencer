@@ -6,8 +6,13 @@
 //   GLOBAL VARIABLES
 // =======================
 UIState uiState; // Central state object for the UI
+// Global sequencers for UI compatibility - these will be references to voice-specific sequencers
 Sequencer seq1(1); // Channel 1 for first sequencer
 Sequencer seq2(2); // Channel 2 for second sequencer
+
+// Voice-specific sequencer instances (owned by voices)
+std::unique_ptr<Sequencer> leadVoiceSequencer;
+std::unique_ptr<Sequencer> bassVoiceSequencer;
 LEDMatrix ledMatrix;
 
 // --- MIDI & Clock ---
@@ -139,8 +144,16 @@ void onClockStart()
 {
     Serial.println("[uClock] onClockStart()");
     usb_midi.sendRealTime(midi::Start);
+    
+    // Start both global sequencers (for UI) and voice-specific sequencers (for audio)
     seq1.start();
     seq2.start();
+    
+    if (leadVoiceSequencer && bassVoiceSequencer) {
+        leadVoiceSequencer->start();
+        bassVoiceSequencer->start();
+    }
+    
     isClockRunning = true;
     unmuteOscillators();
 }
@@ -149,15 +162,22 @@ void onClockStop()
 {
     Serial.println("[uClock] onClockStop()");
     usb_midi.sendRealTime(midi::Stop);
+    
+    // Stop both global sequencers (for UI) and voice-specific sequencers (for audio)
     seq1.stop();
     seq2.stop();
+    
+    if (leadVoiceSequencer && bassVoiceSequencer) {
+        leadVoiceSequencer->stop();
+        bassVoiceSequencer->stop();
+    }
 
     // Use MidiNoteManager for comprehensive cleanup
     midiNoteManager.onSequencerStop();
     
 
     // Legacy allNotesOff() call for sequencer state cleanup
-muteOscillators();
+    muteOscillators();
     isClockRunning = false;
 }
 
@@ -213,9 +233,18 @@ void initOscillators()
     // Create Bass Voice (Voice 2 replacement)
     bassVoiceId = voiceManager->addVoice(VoicePresets::getDigitalVoice());
     
-    // Attach sequencers to voices
-    voiceManager->attachSequencer(leadVoiceId, &seq1);
-    voiceManager->attachSequencer(bassVoiceId, &seq2);
+    // Create independent sequencer instances for each voice
+    leadVoiceSequencer = std::make_unique<Sequencer>(1);
+    bassVoiceSequencer = std::make_unique<Sequencer>(2);
+    
+    // Attach unique sequencer instances to voices
+    voiceManager->attachSequencer(leadVoiceId, leadVoiceSequencer.get());
+    voiceManager->attachSequencer(bassVoiceId, bassVoiceSequencer.get());
+    
+    // Copy initial state from global sequencers to voice-specific sequencers for UI compatibility
+    // This ensures existing UI code continues to work with the global sequencer references
+    *leadVoiceSequencer = seq1;
+    *bassVoiceSequencer = seq2;
     
     Serial.println("Voice system initialized with Lead and Bass voices");
 }
@@ -254,6 +283,36 @@ void onOutputPPQNCallback(uint32_t tick)
     // That's it! Keep the ISR minimal.
 }
 
+
+// =======================
+//   SEQUENCER SYNCHRONIZATION HELPERS
+// =======================
+
+/**
+ * Synchronize global sequencers with voice-specific sequencers
+ * This ensures UI changes are reflected in the audio processing
+ */
+void syncSequencersToVoices() {
+    if (leadVoiceSequencer) {
+        *leadVoiceSequencer = seq1;
+    }
+    if (bassVoiceSequencer) {
+        *bassVoiceSequencer = seq2;
+    }
+}
+
+/**
+ * Synchronize voice-specific sequencers back to global sequencers
+ * This ensures audio processing changes are reflected in the UI
+ */
+void syncSequencersFromVoices() {
+    if (leadVoiceSequencer) {
+        seq1 = *leadVoiceSequencer;
+    }
+    if (bassVoiceSequencer) {
+        seq2 = *bassVoiceSequencer;
+    }
+}
 
 // =======================
 //   HELPER FUNCTIONS FOR VOICE PARAMETER CALCULATIONS
@@ -340,6 +399,8 @@ void updateParametersForStep(uint8_t stepToUpdate) ///  This is the selected ste
     if (parametersWereUpdated)
     {
         updateActiveVoiceState(stepToUpdate, activeSeq);
+        // Synchronize UI changes to voice-specific sequencers
+        syncSequencersToVoices();
     }
 }
 
@@ -463,10 +524,21 @@ void onStepCallback(uint32_t uClockCurrentStep)
 {
     currentSequencerStep = static_cast<uint8_t>(uClockCurrentStep); // Raw uClock step, sequencers handle their own modulo
     
-    // 2. Advance sequencers and get their new state into local temporary variables.
+    // 2. Advance voice-specific sequencers and get their new state into local temporary variables.
     VoiceState tempState1, tempState2;
-    seq1.advanceStep(uClockCurrentStep, mm, uiState, &tempState1, lfo1.Process() * globalLFOs.lfo1amp, lfo2.Process() * globalLFOs.lfo2amp);
-    seq2.advanceStep(uClockCurrentStep, mm, uiState, &tempState2, lfo1.Process() * globalLFOs.lfo1amp, lfo2.Process() * globalLFOs.lfo2amp);
+    
+    // Use voice-specific sequencers for audio processing to ensure parameter independence
+    if (leadVoiceSequencer && bassVoiceSequencer) {
+        leadVoiceSequencer->advanceStep(uClockCurrentStep, mm, uiState, &tempState1, lfo1.Process() * globalLFOs.lfo1amp, lfo2.Process() * globalLFOs.lfo2amp);
+        bassVoiceSequencer->advanceStep(uClockCurrentStep, mm, uiState, &tempState2, lfo1.Process() * globalLFOs.lfo1amp, lfo2.Process() * globalLFOs.lfo2amp);
+        
+        // Sync voice-specific sequencer state back to global sequencers for UI consistency
+        syncSequencersFromVoices();
+    } else {
+        // Fallback to global sequencers if voice-specific ones aren't initialized yet
+        seq1.advanceStep(uClockCurrentStep, mm, uiState, &tempState1, lfo1.Process() * globalLFOs.lfo1amp, lfo2.Process() * globalLFOs.lfo2amp);
+        seq2.advanceStep(uClockCurrentStep, mm, uiState, &tempState2, lfo1.Process() * globalLFOs.lfo1amp, lfo2.Process() * globalLFOs.lfo2amp);
+    }
 
     // 3. Apply AS5600 base values to the voice states before using them
     // Create temporary UIState copies with appropriate voice modes for AS5600 application
@@ -697,8 +769,16 @@ void setup1()
     uClock.setTempo(90);
     uClock.start();
     uClock.setShuffle(true); 
+    
+    // Start global sequencers for UI
     seq1.start();
     seq2.start();
+    
+    // Start voice-specific sequencers for audio processing
+    if (leadVoiceSequencer && bassVoiceSequencer) {
+        leadVoiceSequencer->start();
+        bassVoiceSequencer->start();
+    }
 
 
 
@@ -747,9 +827,15 @@ void loop1()
         // Update MidiNoteManager timing - this handles all MIDI note-off timing
         midiNoteManager.updateTiming(globalTickCounter);
 
-        // Process sequencer note duration timing
-        seq1.tickNoteDuration(&voiceState1);
-        seq2.tickNoteDuration(&voiceState2);
+        // Process sequencer note duration timing using voice-specific sequencers
+        if (leadVoiceSequencer && bassVoiceSequencer) {
+            leadVoiceSequencer->tickNoteDuration(&voiceState1);
+            bassVoiceSequencer->tickNoteDuration(&voiceState2);
+        } else {
+            // Fallback to global sequencers
+            seq1.tickNoteDuration(&voiceState1);
+            seq2.tickNoteDuration(&voiceState2);
+        }
 
         // Process gate timers - now synchronized with MidiNoteManager
         gateTimer1.tick();

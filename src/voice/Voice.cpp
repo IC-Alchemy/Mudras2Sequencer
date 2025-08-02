@@ -110,28 +110,37 @@ float Voice::process() {
     // Process envelope
     float envelopeValue = envelope.Process(gate);
     
-    // Update filter frequency with envelope modulation
-    filter.SetFreq(filterFrequency * envelopeValue);
+    float finalSignal = 0.0f;
     
-    // Process frequency slewing for slide functionality
-    if (state.slide) {
-        for (size_t i = 0; i < oscillators.size() && i < 3; i++) {
-            processFrequencySlew(i, freqSlew[i].targetFreq);
-            oscillators[i].SetFreq(freqSlew[i].currentFreq);
+    if (config.hasParticle) {
+        // Note Parameter → Particle Base Frequency
+        float baseFreq = calculateNoteFrequency(state.note, state.octave);
+        particle.SetFreq(baseFreq);
+        
+        // Process particle synthesis
+        float particleSignal = particle.Process();
+        
+        // Mix oscillators and particle based on mix level
+        float mixedOscillators = 0.0f;
+        for (size_t i = 0; i < oscillators.size(); i++) {
+            mixedOscillators += oscillators[i].Process();
+        }
+        
+        // Crossfade between oscillators and particle
+        finalSignal = (mixedOscillators * (1.0f - config.particleMixLevel)) + 
+                     (particleSignal * config.particleMixLevel);
+    } else {
+        // Standard oscillator processing
+        for (size_t i = 0; i < oscillators.size(); i++) {
+            finalSignal += oscillators[i].Process();
         }
     }
     
-    // Mix oscillators
-    float mixedOscillators = 0.0f;
-    for (size_t i = 0; i < oscillators.size(); i++) {
-        mixedOscillators += oscillators[i].Process();
-    }
-    
     // Apply effects chain
-    processEffectsChain(mixedOscillators);
+    processEffectsChain(finalSignal);
     
-    // Apply filter
-    float filteredSignal = filter.Process(mixedOscillators);
+    // Apply main filter (uses filterFrequency calculated from filter parameter)
+    float filteredSignal = filter.Process(finalSignal);
     
     // Apply high-pass filter
     highPassFilter.Process(filteredSignal);
@@ -145,18 +154,35 @@ float Voice::process() {
 
 void Voice::updateParameters(const VoiceState& newState) {
     state = newState;
-    
-    // Update gate state to sync with sequencer
     gate = state.gate;
     
-    // Apply envelope parameters
+    // Apply envelope parameters (decay affects envelope as usual)
     applyEnvelopeParameters();
     
-    // Calculate and set filter frequency
+    // Standard filter frequency calculation for main filter
     filterFrequency = daisysp::fmap(state.filter, 150.0f, 11710.0f, daisysp::Mapping::EXP);
     
     // Update oscillator frequencies
     updateOscillatorFrequencies();
+    
+    // Update particle parameters if enabled
+    if (config.hasParticle) {
+        // Filter Parameter → Particle Resonance (0.1 to 0.95)
+        float resonance = daisysp::fmap(state.filter, 0.1f, 0.95f, daisysp::Mapping::LINEAR);
+        particle.SetResonance(resonance);
+        
+        // Attack Parameter → Particle Density (inverted: faster attack = higher density)
+        // Attack range 0.0-1.0, map to density 0.2-1.0 (inverted)
+        float density = daisysp::fmap(1.0f - state.attack, 0.2f, 1.0f, daisysp::Mapping::LINEAR);
+        particle.SetDensity(density);
+        
+        // Velocity Parameter → Particle Gain
+        float gain = state.velocity * config.particleGain;
+        particle.SetGain(gain);
+        
+        // Note Parameter → Particle Base Frequency (set in process() method)
+        // This will be handled in the process() method for real-time updates
+    }
 }
 
 void Voice::setSequencer(std::unique_ptr<Sequencer> seq) {

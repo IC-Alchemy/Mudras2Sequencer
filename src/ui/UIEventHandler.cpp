@@ -13,6 +13,10 @@ extern void onClockStop();
 extern void setLEDTheme(LEDTheme theme);
 extern void applyVoicePreset(uint8_t voiceNumber, uint8_t presetIndex);
 
+// Forward declarations for sequencer synchronization functions
+void syncSequencersToVoices();
+void syncSequencersFromVoices();
+
 // External variables that are still needed from the main file
 extern uint8_t currentScale;
 extern bool isClockRunning;
@@ -114,6 +118,7 @@ void matrixEventHandler(const MatrixButtonEvent &evt, UIState &uiState,
       uint8_t newSlideValue = (currentSlideValue > 0) ? 0 : 1;
       currentActiveSeq.setStepParameterValue(ParamId::Slide, evt.buttonIndex,
                                              newSlideValue);
+      syncSequencersToVoices();
       Serial.print("Step ");
       Serial.print(evt.buttonIndex);
       Serial.print(" slide ");
@@ -141,6 +146,7 @@ void matrixEventHandler(const MatrixButtonEvent &evt, UIState &uiState,
       if (!isLongPress(heldTime)) {
         // Short press: randomize parameters
         seq1.randomizeParameters();
+        syncSequencersToVoices();
         Serial.println("Seq 1 randomized by short press");
       }
       // Reset button state flags
@@ -166,6 +172,7 @@ void matrixEventHandler(const MatrixButtonEvent &evt, UIState &uiState,
       if (!isLongPress(heldTime)) {
         // Short press: randomize parameters
         seq2.randomizeParameters();
+        syncSequencersToVoices();
         Serial.println("Seq 2 randomized by short press");
       }
       // Reset button state flags
@@ -309,6 +316,7 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
       uint8_t newStepCount = evt.buttonIndex + 1;
       currentActiveSeq.setParameterStepCount(heldMapping->paramId,
                                              newStepCount);
+      syncSequencersToVoices();
       Serial.print("Set ");
       Serial.print(heldMapping->name);
       Serial.print(" parameter length to ");
@@ -336,6 +344,7 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
       } else {
         // Short press toggles step (on/off) and exits edit mode
         currentActiveSeq.toggleStep(evt.buttonIndex);
+        syncSequencersToVoices();
         uiState.selectedStepForEdit = -1;
       }
     }
@@ -517,6 +526,7 @@ void pollUIHeldButtons(UIState &uiState, Sequencer &seq1, Sequencer &seq2) {
   if (uiState.randomize1WasPressed && !uiState.randomize1ResetTriggered) {
     if (isLongPress(currentTime - uiState.randomize1PressTime)) {
       seq1.resetAllSteps();
+      syncSequencersToVoices();
       uiState.resetStepsLightsFlag = true;
       uiState.randomize1ResetTriggered = true;
       Serial.println("Seq 1 reset by long press");
@@ -527,6 +537,7 @@ void pollUIHeldButtons(UIState &uiState, Sequencer &seq1, Sequencer &seq2) {
   if (uiState.randomize2WasPressed && !uiState.randomize2ResetTriggered) {
     if (isLongPress(currentTime - uiState.randomize2PressTime)) {
       seq2.resetAllSteps();
+      syncSequencersToVoices();
       uiState.resetStepsLightsFlag = true;
       uiState.randomize2ResetTriggered = true;
       Serial.println("Seq 2 reset by long press");
