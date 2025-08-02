@@ -111,7 +111,7 @@ CRGB getParameterColor(ParamId param, uint8_t intensity) {
     return ColorFromPalette(parameterColors, paletteIndex, intensity);
 }
 
-void addPolyrhythmicOverlay(
+void addPolymetricOverlay(
     LEDMatrix& ledMatrix,
     const Sequencer& seq,
     bool isVoice2Mode,
@@ -415,8 +415,8 @@ void updateStepLEDs(
     } else {
         updateGateLEDs(ledMatrix, seq1, seq2, uiState);
 
-        addPolyrhythmicOverlay(ledMatrix, seq1, false, 32);
-        addPolyrhythmicOverlay(ledMatrix, seq2, true, 32);
+        addPolymetricOverlay(ledMatrix, seq1, false, 32);
+        addPolymetricOverlay(ledMatrix, seq2, true, 32);
 
         if (uiState.selectedStepForEdit >= 0 && uiState.selectedStepForEdit < 16) {
             int ledIndex = uiState.isVoice2Mode ? (ledOffset + uiState.selectedStepForEdit) : uiState.selectedStepForEdit;

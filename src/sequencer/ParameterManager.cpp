@@ -150,7 +150,7 @@ void ParameterManager::randomizeParameters()
                 break;
             }
             case ParamId::Attack: {
-                std::uniform_real_distribution<float> dist(0.0f, 0.05f);
+                std::uniform_real_distribution<float> dist(0.0f, 0.2f);
                 _tracks[i].setValue(step, dist(generator));
                 break;
             }

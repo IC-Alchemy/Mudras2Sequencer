@@ -186,11 +186,6 @@ void Sequencer::advanceStep(uint8_t current_uclock_step, int mm_distance,
         return;
     }
 
-    // Output step clock pulse on pin 12 (with swing timing from uClock)
-    // This triggers on every step regardless of gate state
-    digitalWrite(12, HIGH);
-    delayMicroseconds(10);  // Short 10μs pulse
-    digitalWrite(12, LOW);
 
     // Use the Gate parameter's step count to determine the main sequence length
     uint8_t sequenceLength = getParameterStepCount(ParamId::Gate);
@@ -204,7 +199,7 @@ void Sequencer::advanceStep(uint8_t current_uclock_step, int mm_distance,
     }
 
     // Advance each parameter's step counter independently based on its own step count
-    // This enables polyrhythmic patterns where different parameters cycle at different rates
+    // This enables polymetric patterns where different parameters cycle at different rates
     for (size_t i = 0; i < static_cast<size_t>(ParamId::Count); ++i)
     {
         ParamId paramId = static_cast<ParamId>(i);
@@ -242,9 +237,7 @@ void Sequencer::advanceStep(uint8_t current_uclock_step, int mm_distance,
             {ParamId::Attack, is_attack_button_held},
             {ParamId::Decay, is_decay_button_held},
             {ParamId::Octave, is_octave_button_held}
-            // Removed: {ParamId::Slide, slideMode}
-            // This was causing slide values to be overwritten during playback in slide mode.
-            // Slide values should only be set via step presses in slide mode, not real-time recording.
+
         };
 
         for (const auto &pb : paramButtons)

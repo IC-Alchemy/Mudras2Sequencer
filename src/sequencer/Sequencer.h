@@ -39,15 +39,15 @@ private:
 };
 
 /**
- * @brief Polyrhythmic step sequencer with independent parameter tracks
+ * @brief Polymetric step sequencer with independent parameter tracks
  *
  * The Sequencer class implements the core sequencing logic for the PicoMudrasSequencer.
  * Each parameter (Note, Velocity, Filter, Attack, Decay, Octave, GateLength, Gate, Slide)
  * operates as an independent track with configurable step counts, enabling complex
- * polyrhythmic patterns that evolve over hundreds of steps.
+ * polymetric patterns that evolve over hundreds of steps.
  *
  * Key Features:
- * - Independent parameter track advancement (polyrhythmic sequencing)
+ * - Independent parameter track advancement (polymetric sequencing)
  * - Real-time parameter recording via sensor input
  * - Thread-safe operation for dual-core architecture
  * - Dual voice support for layered compositions
@@ -97,11 +97,11 @@ public:
     void setMidiNoteOffCallback(void (*callback)(uint8_t note, uint8_t channel));
 
     /**
-     * @brief Advance sequencer by one step with polyrhythmic parameter tracking
+     * @brief Advance sequencer by one step with polymetric parameter tracking
      *
      * This is the core sequencing method that implements independent parameter
      * track advancement. Each parameter advances at its own configured step count,
-     * enabling complex polyrhythmic patterns.
+     * enabling complex polymetric patterns.
      *
      * Data Flow:
      * 1. Calculate currentStepPerParam[i] = uclock_step % paramStepCount[i] for each parameter
