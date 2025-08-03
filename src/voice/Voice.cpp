@@ -260,14 +260,14 @@ namespace VoicePresets {
         config.oscWaveforms[0] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
         config.oscWaveforms[1] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
         config.oscWaveforms[2] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
-        config.oscAmplitudes[0] = .33f;
+        config.oscAmplitudes[0] = .53f;
         config.oscAmplitudes[1] = .33f;
         config.oscAmplitudes[2] = .33f;
         config.oscDetuning[0] = 0.0f;
-        config.oscDetuning[1] = 0.001f; // Slight detune
-        config.oscDetuning[2] = -0.001f; // Slight detune opposite
+        config.oscDetuning[1] = 0.004f; // Slight detune
+        config.oscDetuning[2] = -0.004f; // Slight detune opposite
         
-        config.filterRes = 0.33f;
+        config.filterRes = 0.39f;
         config.filterDrive = 2.1f;
         config.filterPassbandGain = 0.23f;
         config.highPassFreq = 140.0f;
@@ -292,8 +292,8 @@ namespace VoicePresets {
         config.oscWaveforms[0] = daisysp::Oscillator::WAVE_POLYBLEP_SQUARE;
         config.oscWaveforms[1] = daisysp::Oscillator::WAVE_POLYBLEP_SQUARE;
         config.oscWaveforms[2] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
-        config.oscAmplitudes[0] = 0.3f;
-        config.oscAmplitudes[1] = 0.3f;
+        config.oscAmplitudes[0] = 0.43f;
+        config.oscAmplitudes[1] = 0.43f;
         config.oscAmplitudes[2] = .6f;
         config.oscPulseWidth[0] = 0.6f;
         config.oscPulseWidth[1] = 0.35f;
@@ -321,12 +321,14 @@ namespace VoicePresets {
         config.oscillatorCount = 3;
         config.oscWaveforms[0] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
         config.oscWaveforms[1] = daisysp::Oscillator::WAVE_POLYBLEP_TRI;
-        config.oscAmplitudes[0] = .4f;
+        config.oscWaveforms[2] = daisysp::Oscillator::WAVE_POLYBLEP_TRI;
+        config.oscAmplitudes[0] = .3f;
         config.oscAmplitudes[1] = 1.f;
-        config.oscDetuning[2] = -12.0f; // One octave down
+        config.oscAmplitudes[2] = 1.f;
+        config.oscDetuning[1] = -12.0f; // One octave down
         
-        config.filterRes = 0.4f;
-        config.filterDrive = 2.f;
+        config.filterRes = 0.2f;
+        config.filterDrive = 2.7f;
         config.filterPassbandGain = 0.22f;
         config.highPassFreq =66.0f; // Lower for bass
         
@@ -335,7 +337,7 @@ namespace VoicePresets {
         
         config.defaultAttack = 0.01f;
         config.defaultDecay = 0.3f;
-        config.defaultSustain = 0.7f;
+        config.defaultSustain = 0.5f;
         config.defaultRelease = 0.2f;
         
         return config;
@@ -348,25 +350,25 @@ namespace VoicePresets {
         config.oscWaveforms[1] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
         config.oscWaveforms[2] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
         config.oscAmplitudes[0] = .55f;
-        config.oscAmplitudes[1] = .33f;
-        config.oscAmplitudes[2] = 0.33f;
+        config.oscAmplitudes[1] = .43f;
+        config.oscAmplitudes[2] = 0.43f;
         config.oscDetuning[0] = 0.0f;
         config.oscDetuning[1] = 0.0002f;  // Perfect fifth
         config.oscDetuning[2] = 0.0002f; // Slight detune
         
-        config.filterRes = 0.45f;
-        config.filterDrive =3.5f;
+        config.filterRes = 0.585f;
+        config.filterDrive = 2.2f;
         config.filterPassbandGain = 0.25f;
-        config.highPassFreq = 120.0f;
+        config.highPassFreq = 150.0f;
         
-        config.hasOverdrive = true;
+        config.hasOverdrive = false;
         config.hasWavefolder = false;
         config.overdriveAmount = 0.2f;
         config.wavefolderGain = 1.0f;
         
         config.defaultAttack = 0.02f;
         config.defaultDecay = 0.2f;
-        config.defaultSustain = 0.5f;
+        config.defaultSustain = 0.3f;
         config.defaultRelease = 0.15f;
         
         return config;
@@ -386,7 +388,7 @@ namespace VoicePresets {
         config.oscDetuning[2] = 7.0f;  // Perfect fifth above octave
         
         config.filterRes = 0.15f;
-        config.filterDrive = 0.8f;
+        config.filterDrive = 2.8f;
         config.filterPassbandGain = 0.13f;
         config.highPassFreq = 160.0f;
         
@@ -395,7 +397,7 @@ namespace VoicePresets {
         
         config.defaultAttack = 0.5f;  // Slow attack for pad
         config.defaultDecay = 0.8f;
-        config.defaultSustain = 0.8f;
+        config.defaultSustain = 0.4f;
         config.defaultRelease = 1.0f; // Long release
         
        // config.outputLevel = 0.6f; // Lower level for pad
@@ -414,12 +416,12 @@ namespace VoicePresets {
         config.oscDetuning[1] = 7.0f; // Fifth for metallic sound
         config.oscPulseWidth[0] = 0.1f; // Very narrow pulse
         
-        config.filterRes = 0.55f; // High resonance
+        config.filterRes = 0.59f; // High resonance
         config.filterDrive = 3.0f;
         config.filterPassbandGain = 0.33f;
         config.highPassFreq = 144.0f; // High-pass for percussion
         
-        config.hasOverdrive = true;
+        config.hasOverdrive = false;
         config.hasWavefolder = false;
         config.overdriveAmount = 0.2f;
         config.wavefolderGain = 3.0f;

@@ -4,6 +4,7 @@
 #include "../sequencer/SequencerDefs.h"
 #include "../sequencer/ShuffleTemplates.h"
 #include "../scales/scales.h"
+#include "../ui/ButtonManager.h"
 
 // Constructor implementation
 OLEDDisplay::OLEDDisplay() : display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET), initialized(false) {
@@ -69,11 +70,36 @@ void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Se
         float currentValue = currentSeq.getStepParameterValue(heldParam->paramId, currentStep);
         displayParameterInfo(heldParam->name, currentValue, voice, currentStep);
     } else if (uiState.selectedStepForEdit != -1) {
-        // Show current step if step editing mode
-        display.setCursor(15, 25);
-        display.setTextSize(2);
-        display.print("Edit Step: ");
-        display.println(uiState.selectedStepForEdit + 1);
+        // Step editing mode - show step parameter values
+        if (uiState.currentEditParameter != ParamId::Count) {
+            // Display the currently editing parameter for the selected step
+            uint8_t voice = uiState.isVoice2Mode ? 2 : 1;
+            const Sequencer& currentSeq = uiState.isVoice2Mode ? seq2 : seq1;
+            float currentValue = currentSeq.getStepParameterValue(uiState.currentEditParameter, uiState.selectedStepForEdit);
+            
+            // Find parameter name
+            const char* paramName = "Unknown";
+            for (size_t i = 0; i < PARAM_BUTTON_MAPPINGS_SIZE; ++i) {
+                if (PARAM_BUTTON_MAPPINGS[i].paramId == uiState.currentEditParameter) {
+                    paramName = PARAM_BUTTON_MAPPINGS[i].name;
+                    break;
+                }
+            }
+            
+            displayParameterInfo(paramName, currentValue, voice, uiState.selectedStepForEdit);
+        } else {
+            // No parameter selected - show step selection prompt
+            display.setCursor(5, 20);
+            display.setTextSize(2);
+            display.print("Step ");
+            display.print(uiState.selectedStepForEdit + 1);
+            
+            display.setCursor(5, 40);
+            display.setTextSize(1);
+            display.print("Press param button");
+            display.setCursor(5, 50);
+            display.print("to edit");
+        }
     } else {
         // Default screen: Show current scale and shuffle pattern with enhanced formatting
         display.setTextSize(1);

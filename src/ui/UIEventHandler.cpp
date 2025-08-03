@@ -253,6 +253,24 @@ static bool handleParameterButtonEvent(const MatrixButtonEvent &evt,
       if (pressed && mapping.paramId != ParamId::Note) {
         autoSelectAS5600Parameter(mapping.paramId, uiState);
       }
+      
+      // In edit mode, toggle parameter editing instead of requiring continuous holding
+      if (pressed && uiState.selectedStepForEdit >= 0 && mapping.paramId != ParamId::Note) {
+        if (uiState.currentEditParameter == mapping.paramId) {
+          // Toggle off - stop editing this parameter
+          uiState.currentEditParameter = ParamId::Count;
+          Serial.print("Edit mode: Stopped editing ");
+          Serial.println(mapping.name);
+        } else {
+          // Toggle on - start editing this parameter
+          uiState.currentEditParameter = mapping.paramId;
+          autoSelectAS5600Parameter(mapping.paramId, uiState);
+          Serial.print("Edit mode: Started editing ");
+          Serial.print(mapping.name);
+          Serial.print(" for step ");
+          Serial.println(uiState.selectedStepForEdit);
+        }
+      }
       return true;
     }
   }
@@ -330,13 +348,18 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
 
       if (isLongPress(pressDuration)) {
         // Toggle step selection for editing
-        uiState.selectedStepForEdit =
-            (uiState.selectedStepForEdit == evt.buttonIndex) ? -1
-                                                             : evt.buttonIndex;
+        //Single step is now selected for editting
+        if (uiState.selectedStepForEdit == evt.buttonIndex) {
+          uiState.selectedStepForEdit = -1;
+          uiState.currentEditParameter = ParamId::Count; // Clear edit parameter when exiting edit mode
+        } else {
+          uiState.selectedStepForEdit = evt.buttonIndex;
+        }
       } else {
         // Short press toggles step (on/off) and exits edit mode
         currentActiveSeq.toggleStep(evt.buttonIndex);
         uiState.selectedStepForEdit = -1;
+        uiState.currentEditParameter = ParamId::Count; // Clear edit parameter when exiting edit mode
       }
     }
   }
@@ -349,6 +372,7 @@ static void handleControlButtonEvent(uint8_t buttonIndex, UIState &uiState,
   case BUTTON_SLIDE_MODE:
     uiState.slideMode = !uiState.slideMode;
     uiState.selectedStepForEdit = -1;
+    uiState.currentEditParameter = ParamId::Count; // Clear edit parameter when exiting edit mode
     Serial.print("Slide mode ");
     Serial.println(uiState.slideMode ? "ON" : "OFF");
     break;

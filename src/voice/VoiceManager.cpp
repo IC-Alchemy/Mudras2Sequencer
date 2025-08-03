@@ -163,8 +163,9 @@ bool VoiceManager::isVoiceEnabled(uint8_t voiceId) const {
 }
 
 std::vector<uint8_t> VoiceManager::getActiveVoiceIds() const {
+    // OPTIMIZATION: Pre-allocate with exact size to avoid dynamic reallocation
     std::vector<uint8_t> activeIds;
-    activeIds.reserve(voices.size());
+    activeIds.reserve(voices.size()); // Reserve maximum possible size
     
     for (const auto& managedVoice : voices) {
         if (managedVoice->enabled) {
@@ -251,23 +252,25 @@ VoiceConfig VoiceManager::getPresetConfig(const std::string& presetName) {
     }
 }
 
-// Private helper methods
+// Private helper methods - OPTIMIZED for embedded performance
 VoiceManager::ManagedVoice* VoiceManager::findVoice(uint8_t voiceId) {
-    auto it = std::find_if(voices.begin(), voices.end(),
-        [voiceId](const std::unique_ptr<ManagedVoice>& v) {
-            return v->id == voiceId;
-        });
-    
-    return (it != voices.end()) ? it->get() : nullptr;
+    // OPTIMIZATION: Use direct iteration instead of std::find_if for better embedded performance
+    for (auto& voice : voices) {
+        if (voice->id == voiceId) {
+            return voice.get();
+        }
+    }
+    return nullptr;
 }
 
 const VoiceManager::ManagedVoice* VoiceManager::findVoice(uint8_t voiceId) const {
-    auto it = std::find_if(voices.begin(), voices.end(),
-        [voiceId](const std::unique_ptr<ManagedVoice>& v) {
-            return v->id == voiceId;
-        });
-    
-    return (it != voices.end()) ? it->get() : nullptr;
+    // OPTIMIZATION: Use direct iteration instead of std::find_if for better embedded performance
+    for (const auto& voice : voices) {
+        if (voice->id == voiceId) {
+            return voice.get();
+        }
+    }
+    return nullptr;
 }
 
 uint8_t VoiceManager::generateVoiceId() {

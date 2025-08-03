@@ -34,13 +34,20 @@ extern const FlashSpeedConfig FLASH_SPEED_ZONES[];
 void applyIncrementToParameter(AS5600BaseValues* baseValues, AS5600ParameterMode param, float increment);
 
 void updateAS5600BaseValues(UIState& uiState);
-void applyAS5600BaseValues( VoiceState *voiceState, const UIState& uiState);
+void updateAS5600StepParameterValues(UIState& uiState);
+void applyAS5600BaseValues(VoiceState *voiceState, uint8_t voiceId);
 void applyAS5600DelayValues();
 void applyAS5600LFOValues();
 float getParameterMinValue(AS5600ParameterMode param);
 float getParameterMaxValue(AS5600ParameterMode param);
 float getAS5600BaseValueRange(AS5600ParameterMode param);
 float clampAS5600BaseValue(AS5600ParameterMode param, float value);
+
+// Helper functions for step parameter editing
+ParamId convertAS5600ParameterToParamId(AS5600ParameterMode as5600Param);
+float getParameterMinValueForParamId(ParamId paramId);
+float getParameterMaxValueForParamId(ParamId paramId);
+String formatParameterValueForDisplay(ParamId paramId, float value);
 
 // Additional AS5600 helper functions moved from main file
 float calculateAS5600BoundaryProximity(AS5600ParameterMode param);

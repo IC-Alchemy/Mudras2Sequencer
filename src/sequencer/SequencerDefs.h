@@ -32,13 +32,14 @@ enum class AS5600ParameterMode : uint8_t {
     Filter = 1,
     Attack = 2,
     Decay = 3,
-    DelayTime = 4,
-    DelayFeedback = 5,
-    LFO1freq = 6,
-    LFO1amp = 7,
-    LFO2freq = 8,
-    LFO2amp = 9,
-    COUNT = 10
+    Note = 4,
+    DelayTime = 5,
+    DelayFeedback = 6,
+    LFO1freq = 7,
+    LFO1amp = 8,
+    LFO2freq = 9,
+    LFO2amp = 10,
+    COUNT = 11
 };
 
 // AS5600 parameter base values (per voice) - supports bidirectional control

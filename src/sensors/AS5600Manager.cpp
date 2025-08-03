@@ -1,6 +1,7 @@
 #include "AS5600Manager.h"
 #include <Arduino.h>
 #include "../sequencer/SequencerDefs.h"
+#include "../sequencer/Sequencer.h"
 #include "../ui/UIState.h"
 #include "as5600.h"
 #include <algorithm>
@@ -45,8 +46,10 @@ float getParameterMinValue(AS5600ParameterMode param)
     case AS5600ParameterMode::Attack:
     case AS5600ParameterMode::Decay:
         return 0.0f;
+    case AS5600ParameterMode::Note:
+        return 0.0f; // Note range: 0.0 to 21.0 (scale array indices)
     case AS5600ParameterMode::DelayTime:
-        return 480.0f; // 10ms minimum delay (480 samples at 48kHz)
+        return 120.0f; // 10ms minimum delay (480 samples at 48kHz)
     case AS5600ParameterMode::DelayFeedback:
         return 0.0f;
     case AS5600ParameterMode::LFO1freq:
@@ -71,16 +74,18 @@ float getParameterMaxValue(AS5600ParameterMode param)
     case AS5600ParameterMode::Attack:
     case AS5600ParameterMode::Decay:
         return 1.0f;
+    case AS5600ParameterMode::Note:
+        return 21.0f; // Note range: 0.0 to 21.0 (scale array indices)
     case AS5600ParameterMode::DelayTime:
-        return MAX_DELAY_SAMPLES * .75f; // Maximum delay in samples (1.8 seconds)
+        return MAX_DELAY_SAMPLES * .85f; // Maximum delay in samples (1.8 seconds)
     case AS5600ParameterMode::DelayFeedback:
         return 0.91f; // Maximum 95% feedback to prevent excessive feedback
     case AS5600ParameterMode::LFO1freq:
     case AS5600ParameterMode::LFO2freq:
-        return 8.0f; // 20Hz maximum LFO frequency
+        return 20.0f; // Maximum 20 Hz LFO frequency
     case AS5600ParameterMode::LFO1amp:
     case AS5600ParameterMode::LFO2amp:
-        return 1.0f; // 100% maximum amplitude
+        return 1.0f; // Maximum 100% LFO amplitude
     default:
         return 1.0f;
     }
@@ -117,6 +122,13 @@ void updateAS5600BaseValues(UIState& uiState)
         return;
     }
 
+    // Check if we're in edit mode for a specific step
+    if (uiState.selectedStepForEdit >= 0)
+    {
+        updateAS5600StepParameterValues(uiState);
+        return;
+    }
+
     // Get current AS5600 base values for the active voice
     AS5600BaseValues *activeBaseValues = uiState.isVoice2Mode ? (AS5600BaseValues *)&as5600BaseValuesVoice2 : (AS5600BaseValues *)&as5600BaseValuesVoice1;
 
@@ -134,6 +146,66 @@ void updateAS5600BaseValues(UIState& uiState)
 
     // Apply increment to the appropriate parameter with boundary checking
     applyIncrementToParameter(activeBaseValues, uiState.currentAS5600Parameter, increment);
+}
+
+// --- Update AS5600 Step Parameter Values (Edit Mode) ---
+void updateAS5600StepParameterValues(UIState& uiState)
+{
+    if (!as5600Sensor.isConnected() || uiState.selectedStepForEdit < 0 || uiState.currentEditParameter == ParamId::Count)
+    {
+        return;
+    }
+
+    // Get the active sequencer based on voice mode
+    extern Sequencer seq1, seq2;
+    Sequencer& activeSeq = uiState.isVoice2Mode ? seq2 : seq1;
+    
+    // Use the currently selected edit parameter
+    ParamId targetParamId = uiState.currentEditParameter;
+    if (targetParamId == ParamId::Count)
+    {
+        return; // No parameter selected for editing
+    }
+
+    // Get parameter range for the target parameter
+    float minVal = getParameterMinValueForParamId(targetParamId);
+    float maxVal = getParameterMaxValueForParamId(targetParamId);
+    
+    // Get velocity-sensitive increment with full range scaling
+    float increment = as5600Sensor.getParameterIncrement(minVal - maxVal, maxVal - minVal, 3);
+
+    // Ignore tiny increments to prevent noise
+    const float MINIMUM_INCREMENT_THRESHOLD = 0.0005f;
+    if (abs(increment) < MINIMUM_INCREMENT_THRESHOLD)
+    {
+        return;
+    }
+
+    // Get current parameter value for the selected step
+    uint8_t stepIndex = static_cast<uint8_t>(uiState.selectedStepForEdit);
+    float currentValue = activeSeq.getStepParameterValue(targetParamId, stepIndex);
+    
+    // Apply increment with boundary checking
+    float newValue = currentValue + increment;
+    newValue = std::max(minVal, std::min(newValue, maxVal));
+    
+    // Set the new parameter value
+    activeSeq.setStepParameterValue(targetParamId, stepIndex, newValue);
+    
+    // Trigger immediate OLED update by updating the active voice state
+    extern void updateActiveVoiceState(uint8_t stepIndex, Sequencer& activeSeq);
+    updateActiveVoiceState(stepIndex, activeSeq);
+    
+    // Debug output
+    Serial.print("AS5600 Edit Mode - Step ");
+    Serial.print(stepIndex);
+    Serial.print(", Parameter: ");
+    Serial.print(CORE_PARAMETERS[static_cast<int>(targetParamId)].name);
+    Serial.print(", Value: ");
+    Serial.print(newValue, 3);
+    Serial.print(" (");
+    Serial.print(formatParameterValueForDisplay(targetParamId, newValue));
+    Serial.println(")");
 }
 
 // Helper function to apply increment with boundary checking
@@ -218,6 +290,84 @@ void applyIncrementToParameter(AS5600BaseValues *baseValues, AS5600ParameterMode
     */
 }
 
+// --- Helper Functions for Step Parameter Editing ---
+
+// Convert AS5600ParameterMode to ParamId for step editing
+ParamId convertAS5600ParameterToParamId(AS5600ParameterMode as5600Param)
+{
+    switch (as5600Param)
+    {
+    case AS5600ParameterMode::Velocity:
+        return ParamId::Velocity;
+    case AS5600ParameterMode::Filter:
+        return ParamId::Filter;
+    case AS5600ParameterMode::Attack:
+        return ParamId::Attack;
+    case AS5600ParameterMode::Decay:
+        return ParamId::Decay;
+    case AS5600ParameterMode::Note:
+        return ParamId::Note;
+    default:
+        return ParamId::Count; // Invalid for step editing
+    }
+}
+
+// Get parameter minimum value for ParamId
+float getParameterMinValueForParamId(ParamId paramId)
+{
+    switch (paramId)
+    {
+    case ParamId::Velocity:
+    case ParamId::Filter:
+    case ParamId::Attack:
+    case ParamId::Decay:
+        return 0.0f;
+    case ParamId::Note:
+        return 0.0f; // Note range: 0.0 to 21.0 (scale array indices)
+    default:
+        return 0.0f;
+    }
+}
+
+// Get parameter maximum value for ParamId
+float getParameterMaxValueForParamId(ParamId paramId)
+{
+    switch (paramId)
+    {
+    case ParamId::Velocity:
+    case ParamId::Filter:
+    case ParamId::Attack:
+    case ParamId::Decay:
+        return 1.0f;
+    case ParamId::Note:
+        return 21.0f; // Note range: 0.0 to 21.0 (scale array indices)
+    default:
+        return 1.0f;
+    }
+}
+
+// Format parameter value for display (similar to OLED formatParameterValue)
+String formatParameterValueForDisplay(ParamId paramId, float value)
+{
+    switch (paramId)
+    {
+    case ParamId::Note:
+        return String((int)value);
+    case ParamId::Velocity:
+        return String((int)(value * 100)) + "%";
+    case ParamId::Filter:
+    {
+        int filterFreq = daisysp::fmap(value, 100.0f, 6710.0f, daisysp::Mapping::EXP);
+        return String(filterFreq) + "Hz";
+    }
+    case ParamId::Attack:
+    case ParamId::Decay:
+        return String(value, 3) + "s";
+    default:
+        return String(value, 2);
+    }
+}
+
 // Helper function for the "Shift and Scale" mapping.
 // This function takes a sequencer value (0.0-1.0) and an AS5600 offset
 // (a bipolar value, e.g., -0.6 to 0.6) and combines them intelligently.
@@ -246,14 +396,15 @@ float shiftAndScale(float seqValue, float as5600Offset)
  * This avoids "dead zones" by scaling the sequencer's output within the range
  * defined by the encoder's offset.
  * */
-void applyAS5600BaseValues(VoiceState *voiceState, const UIState& uiState)
+void applyAS5600BaseValues(VoiceState *voiceState, uint8_t voiceId)
 {
     if (!as5600Sensor.isConnected() || !voiceState)
     {
         return;
     }
 
-    const AS5600BaseValues *baseValues = uiState.isVoice2Mode ? (const AS5600BaseValues *)&as5600BaseValuesVoice2 : (const AS5600BaseValues *)&as5600BaseValuesVoice1;
+    // Select the correct base values based on voice ID (0 = voice1, 1 = voice2)
+    const AS5600BaseValues *baseValues = (voiceId == 1) ? (const AS5600BaseValues *)&as5600BaseValuesVoice2 : (const AS5600BaseValues *)&as5600BaseValuesVoice1;
 
     // Apply "Shift and Scale" for each parameter.
     // This maps the sequencer value into the dynamic range set by the AS5600 offset.

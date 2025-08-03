@@ -24,6 +24,7 @@ struct UIState {
     bool slideMode = false;
     bool isVoice2Mode = false;
     int selectedStepForEdit = -1;
+    ParamId currentEditParameter = ParamId::Count; // Parameter being edited in toggle mode (Count = none)
     int currentThemeIndex = 0;
     AS5600ParameterMode currentAS5600Parameter = AS5600ParameterMode::Velocity;
 

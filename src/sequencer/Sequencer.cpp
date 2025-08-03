@@ -189,7 +189,6 @@ void Sequencer::advanceStep(uint8_t current_uclock_step, int mm_distance,
     // Output step clock pulse on pin 12 (with swing timing from uClock)
     // This triggers on every step regardless of gate state
     digitalWrite(12, HIGH);
-    delayMicroseconds(10);  // Short 10μs pulse
     digitalWrite(12, LOW);
 
     // Use the Gate parameter's step count to determine the main sequence length
@@ -225,7 +224,8 @@ void Sequencer::advanceStep(uint8_t current_uclock_step, int mm_distance,
     bool parametersRecorded = false;
 
     // Handle real-time parameter recording first
-    if (current_selected_step_for_edit == -1)
+    // Disable distance sensor control when in edit mode (selectedStepForEdit >= 0)
+    if (mm_distance >= 0 && current_selected_step_for_edit == -1)
     {
         // Simple normalization of sensor distance value
         const float normalizedDistance = std::max(0.0f, std::min(static_cast<float>(mm_distance) / MAX_SENSOR_DISTANCE_MM, 1.0f));

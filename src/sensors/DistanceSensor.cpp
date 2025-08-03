@@ -64,7 +64,6 @@ void DistanceSensor::update() {
         if (status == VL53L1_ERROR_NONE) {
             break; // Data is ready
         }
-        delayMicroseconds(500); // Small delay to prevent tight loop
     }
 
     // If we timed out, skip this reading
