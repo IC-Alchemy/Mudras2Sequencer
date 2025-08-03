@@ -167,8 +167,8 @@ void Voice::updateParameters(const VoiceState& newState) {
     
     // Update particle parameters if enabled
     if (config.hasParticle) {
-        // Filter Parameter → Particle Resonance (0.1 to 0.95)
-        float resonance = daisysp::fmap(state.filter, 0.1f, 0.95f, daisysp::Mapping::LINEAR);
+        // Filter Parameter → Particle Resonance (0.5 to 0.95)
+        float resonance = daisysp::fmap(state.filter, 0.5f, 0.95f, daisysp::Mapping::LINEAR);
         particle.SetResonance(resonance);
         
         // Attack Parameter → Particle Density (inverted: faster attack = higher density)
@@ -349,7 +349,7 @@ namespace VoicePresets {
         config.oscWaveforms[1] = daisysp::Oscillator::WAVE_POLYBLEP_TRI;
         config.oscAmplitudes[0] = .4f;
         config.oscAmplitudes[1] = 1.f;
-        config.oscDetuning[2] = -12.0f; // One octave down
+        config.oscDetuning[1] = -12.0f; // One octave down
         
         config.filterRes = 0.4f;
         config.filterDrive = 2.f;

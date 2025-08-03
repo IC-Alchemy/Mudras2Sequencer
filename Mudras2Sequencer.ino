@@ -1,6 +1,6 @@
 #include "includes.h"
 #include "diagnostic.h"
-#include "src/voice/Voice.h"
+#include "src/voice/ModularVoice.h"
 
 // =======================
 //   GLOBAL VARIABLES
@@ -26,7 +26,7 @@ constexpr float SAMPLE_RATE = 48000.0f;                                       //
 constexpr size_t MAX_DELAY_SAMPLES = static_cast<size_t>(SAMPLE_RATE * 1.8f); 
 // --- Audio & Synth ---
 // New Voice System
-std::unique_ptr<VoiceManager> voiceManager;
+std::unique_ptr<EnhancedVoiceManager> voiceManager;
 uint8_t leadVoiceId = 0;
 uint8_t bassVoiceId = 0;
 
@@ -149,11 +149,7 @@ void onClockStart()
     seq1.start();
     seq2.start();
     
-    if (leadVoiceSequencer && bassVoiceSequencer) {
-        leadVoiceSequencer->start();
-        bassVoiceSequencer->start();
-    }
-    
+ 
     isClockRunning = true;
     unmuteOscillators();
 }
@@ -167,11 +163,7 @@ void onClockStop()
     seq1.stop();
     seq2.stop();
     
-    if (leadVoiceSequencer && bassVoiceSequencer) {
-        leadVoiceSequencer->stop();
-        bassVoiceSequencer->stop();
-    }
-
+ 
     // Use MidiNoteManager for comprehensive cleanup
     midiNoteManager.onSequencerStop();
     
@@ -224,22 +216,30 @@ void initOscillators()
     // Initialize delay target to match initial delay
     delayTarget = static_cast<float>(delaySamples1);
 
-    // Initialize Voice Manager
-    voiceManager = std::make_unique<VoiceManager>(SAMPLE_RATE);
+    // Initialize Modular Voice Manager
+    voiceManager = std::make_unique<EnhancedVoiceManager>();
+    voiceManager->init(SAMPLE_RATE);
+    voiceManager->enableModularMode(true);
     
     // Create Lead Voice (Voice 1 replacement)
-    leadVoiceId = voiceManager->addVoice(VoicePresets::getAnalogVoice());
+    voiceManager->createVoiceFromLegacy(0, VoicePresets::getAnalogVoice());
+    leadVoiceId = 0;
     
     // Create Bass Voice (Voice 2 replacement)
-    bassVoiceId = voiceManager->addVoice(VoicePresets::getDigitalVoice());
+    voiceManager->createVoiceFromLegacy(1, VoicePresets::getDigitalVoice());
+    bassVoiceId = 1;
     
     // Create independent sequencer instances for each voice
     leadVoiceSequencer = std::make_unique<Sequencer>(1);
     bassVoiceSequencer = std::make_unique<Sequencer>(2);
     
     // Attach unique sequencer instances to voices
-    voiceManager->attachSequencer(leadVoiceId, leadVoiceSequencer.get());
-    voiceManager->attachSequencer(bassVoiceId, bassVoiceSequencer.get());
+    if (auto v = voiceManager->getVoice(leadVoiceId)) {
+        v->setSequencer(leadVoiceSequencer.get());
+    }
+    if (auto v = voiceManager->getVoice(bassVoiceId)) {
+        v->setSequencer(bassVoiceSequencer.get());
+    }
     
     // Copy initial state from global sequencers to voice-specific sequencers for UI compatibility
     // This ensures existing UI code continues to work with the global sequencer references
@@ -256,17 +256,16 @@ void applyVoicePreset(uint8_t voiceNumber, uint8_t presetIndex) {
         return;
     }
     
-    VoiceConfig config = VoicePresets::getPresetConfig(presetIndex);
+    VoiceConfig legacyConfig = VoicePresets::getPresetConfig(presetIndex);
+    ModularVoiceConfig config = ModularVoiceConfig::fromLegacy(legacyConfig);
     uint8_t voiceId = (voiceNumber == 1) ? leadVoiceId : bassVoiceId;
     
-    if (voiceManager->setVoiceConfig(voiceId, config)) {
-        Serial.print("Applied preset '");
-        Serial.print(VoicePresets::getPresetName(presetIndex));
-        Serial.print("' to Voice ");
-        Serial.println(voiceNumber);
-    } else {
-        Serial.println("Failed to apply voice preset");
-    }
+    voiceManager->setVoiceConfig(voiceId, config);
+    
+    Serial.print("Applied preset '");
+    Serial.print(VoicePresets::getPresetName(presetIndex));
+    Serial.print("' to Voice ");
+    Serial.println(voiceNumber);
 }
 
 // Long press detection is now handled by ButtonManager module
