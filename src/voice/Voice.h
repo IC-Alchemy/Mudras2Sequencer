@@ -6,6 +6,7 @@
 #include "../dsp/adsr.h"
 #include "../dsp/overdrive.h"
 #include "../dsp/wavefolder.h"
+#include "../dsp/whitenoise.h"
 #include "../sequencer/Sequencer.h"
 #include "../sequencer/SequencerDefs.h"
 #include <vector>
@@ -16,6 +17,8 @@
  * Defines the characteristics and behavior of a synthesizer voice
  */
 struct VoiceConfig {
+    // Custom waveform constants
+    static constexpr uint8_t WAVE_NOISE = 255; // Custom noise waveform
     // Oscillator configuration
     uint8_t oscillatorCount = 3;
     uint8_t oscWaveforms[3] = {
@@ -31,7 +34,7 @@ struct VoiceConfig {
     float filterRes = 0.4f;
     float filterDrive = 1.1f;
     float filterPassbandGain = 0.23f;
-    
+    daisysp::LadderFilter::FilterMode filterMode =daisysp::LadderFilter::FilterMode::LP24;
     // High-pass filter settings
     float highPassFreq = 80.0f;
     
@@ -215,6 +218,7 @@ private:
     
     // Audio processing components
     std::vector<daisysp::Oscillator> oscillators;
+    daisysp::WhiteNoise noise_;
     daisysp::LadderFilter filter;
     daisysp::Svf highPassFilter;
     daisysp::Adsr envelope;
