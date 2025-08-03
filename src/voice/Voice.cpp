@@ -328,7 +328,7 @@ namespace VoicePresets {
         config.filterRes = 0.4f;
         config.filterDrive = 2.f;
         config.filterPassbandGain = 0.22f;
-        config.highPassFreq = 40.0f; // Lower for bass
+        config.highPassFreq =66.0f; // Lower for bass
         
         config.hasOverdrive = false;
         config.overdriveAmount = 0.15f; // Subtle overdrive
