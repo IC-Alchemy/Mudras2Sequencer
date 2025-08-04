@@ -18,7 +18,6 @@ struct UIState {
     bool parameterButtonHeld[PARAM_ID_COUNT] = {false};
 
     // --- Mode States ---
-    bool lfoAssignMode = false;
     bool delayOn = true;
     bool modGateParamSeqLengthsMode = false;
     bool slideMode = false;

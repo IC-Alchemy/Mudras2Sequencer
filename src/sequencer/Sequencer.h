@@ -68,7 +68,7 @@ public:
      * @param stepIdx Step index to play (0-63)
      * @param voiceState Output voice state structure
      */
-    void playStepNow(uint8_t stepIdx,  VoiceState* voiceState, float lfo1Value = 0.0f, float lfo2Value = 0.0f);
+    void playStepNow(uint8_t stepIdx,  VoiceState* voiceState);
 
     /**
      * @brief Toggle gate parameter for a specific step
@@ -126,7 +126,7 @@ public:
                      bool is_filter_button_held, bool is_attack_button_held,
                      bool is_decay_button_held, bool is_octave_button_held,
                      int current_selected_step_for_edit,
-                      VoiceState *voiceState, float lfo1Value, float lfo2Value);
+                      VoiceState *voiceState);
 
     /**
      * @brief Advance sequencer by one step using UIState for button states
@@ -138,12 +138,10 @@ public:
      * @param mm_distance Distance sensor reading (0-400mm range)
      * @param uiState UI state containing button states and selected step
      * @param voiceState Output voice state structure for audio synthesis
-     * @param lfo1Value LFO1 value for parameter modulation
-     * @param lfo2Value LFO2 value for parameter modulation
+  
      */
     void advanceStep(uint8_t current_uclock_step, int mm_distance,
-                     const UIState& uiState, VoiceState *voiceState,
-                     float lfo1Value, float lfo2Value);
+                     const UIState& uiState, VoiceState *voiceState);
 
     uint8_t getCurrentStep() const { return currentStep; }
 
@@ -154,8 +152,6 @@ public:
      */
     uint8_t getCurrentStepForParameter(ParamId paramId) const;
 
-    // LFO assignment
-    void assignLFO(uint8_t lfo, ParamId paramId);
 
     // Get step data
     Step getStep(uint8_t stepIdx) const;
@@ -183,12 +179,9 @@ private:
     NoteDurationTracker noteDuration;
     bool previousStepHadSlide; // Track if previous step had slide enabled
 
-    // LFO targets
-    ParamId lfo1Target;
-    ParamId lfo2Target;
 
     // Internal methods
-    void processStep(uint8_t stepIdx,  VoiceState* voiceState, float lfo1Value, float lfo2Value);
+    void processStep(uint8_t stepIdx,  VoiceState* voiceState);
 };
 
 #endif // SEQUENCER_H

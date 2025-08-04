@@ -26,12 +26,6 @@ bool OLEDDisplay::begin() {
     display.setCursor(0, 0);
     display.println("You did it, Here we go");    delay(500);
 
-    display.println("It smells like ");
-    display.println("      Crazy  ");
-    display.println("Can you hear it?");
-    display.println("GET Crazy With it");
-    display.display();
-    delay(1000);
     Serial.println("OLED display initialized successfully");
     return true;
 }

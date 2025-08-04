@@ -23,8 +23,7 @@ void updateControlLEDs(LEDMatrix &ledMatrix, const UIState& uiState)
     const uint8_t pulseValue = ControlLEDs::PULSE_BASE_BRIGHTNESS + (sinf(currentTime * ControlLEDs::PULSE_FREQUENCY) * ControlLEDs::PULSE_AMPLITUDE);
 
     const CRGB delayIndicatorColor = CRGB(0, 166, 55);
-    const CRGB lfo1IndicatorColor = CRGB(0, 33, 190);
-    const CRGB lfo2IndicatorColor = CRGB(12, 22, 122);
+
 
     bool isAS5600Selected = (uiState.currentAS5600Parameter != AS5600ParameterMode::COUNT);
 
@@ -69,18 +68,13 @@ void updateControlLEDs(LEDMatrix &ledMatrix, const UIState& uiState)
         return result.nscale8(static_cast<uint8_t>(paramValue * 255.0f));
     };
 
-    auto createLFOSyncFadeColor = [](const CRGB &baseColor, float lfoValue) {
-        CRGB result = baseColor;
-        return result.nscale8(static_cast<uint8_t>((lfoValue + 1.0f) * 0.5f * 255.0f));
-    };
+ 
 
     for (const auto &btn : paramLEDs) {
         CRGB color;
         bool isHeld = (btn.paramId == ParamId::Slide) ? uiState.slideMode : uiState.parameterButtonHeld[static_cast<int>(btn.paramId)];
 
-        if (uiState.lfoAssignMode) {
-            color = createPulsedColor(uiState.isVoice2Mode ? lfo2IndicatorColor : lfo1IndicatorColor);
-        } else if (isHeld) {
+        if (isHeld) {
             color = createPulsedColor(activeThemeColors->*(btn.colorHeld));
         } else if (isAS5600Selected && as5600Sensor.isConnected() && isCurrentAS5600Button(btn.linearLedIdx)) {
             float paramValue = getAS5600ParameterValue();
@@ -93,30 +87,20 @@ void updateControlLEDs(LEDMatrix &ledMatrix, const UIState& uiState)
 
     CRGB delayTimeColor = CRGB(0, 44, 33);
     CRGB delayFeedbackColor = CRGB(0, 55, 22);
-    CRGB lfo1FreqColor = createLFOSyncFadeColor(lfo1IndicatorColor, lfo1LEDWaveformValue);
-    CRGB lfo1AmpColor = createLFOSyncFadeColor(lfo1IndicatorColor, lfo1LEDWaveformValue);
-    CRGB lfo2FreqColor = createLFOSyncFadeColor(lfo2IndicatorColor, lfo2LEDWaveformValue);
-    CRGB lfo2AmpColor = createLFOSyncFadeColor(lfo2IndicatorColor, lfo2LEDWaveformValue);
 
     if (as5600Sensor.isConnected()) {
         float paramValue = getAS5600ParameterValue();
         switch (uiState.currentAS5600Parameter) {
             case AS5600ParameterMode::DelayTime:    delayTimeColor = createFadedColor(delayIndicatorColor, paramValue); break;
             case AS5600ParameterMode::DelayFeedback:delayFeedbackColor = createFadedColor(delayIndicatorColor, paramValue); break;
-            case AS5600ParameterMode::LFO1freq:     lfo1FreqColor = createFadedColor(lfo1IndicatorColor, paramValue); break;
-            case AS5600ParameterMode::LFO1amp:      lfo1AmpColor = createFadedColor(lfo1IndicatorColor, paramValue); break;
-            case AS5600ParameterMode::LFO2freq:     lfo2FreqColor = createFadedColor(lfo2IndicatorColor, paramValue); break;
-            case AS5600ParameterMode::LFO2amp:      lfo2AmpColor = createFadedColor(lfo2IndicatorColor, paramValue); break;
+          
             default: break;
         }
     }
 
     setLEDByIndex(ControlLEDs::DELAY_TIME_LED, delayTimeColor);
     setLEDByIndex(ControlLEDs::DELAY_FEEDBACK_LED, delayFeedbackColor);
-    setLEDByIndex(ControlLEDs::LFO1_FREQ_LED, lfo1FreqColor);
-    setLEDByIndex(ControlLEDs::LFO1_AMP_LED, lfo1AmpColor);
-    setLEDByIndex(ControlLEDs::LFO2_FREQ_LED, lfo2FreqColor);
-    setLEDByIndex(ControlLEDs::LFO2_AMP_LED, lfo2AmpColor);
+
 
     setLEDByIndex(ControlLEDs::VOICE1_LED, uiState.isVoice2Mode ? CRGB::Black : activeThemeColors->defaultActive);
     setLEDByIndex(ControlLEDs::VOICE2_LED, uiState.isVoice2Mode ? activeThemeColors->defaultInactive : CRGB::Black);

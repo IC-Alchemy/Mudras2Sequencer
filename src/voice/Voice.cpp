@@ -292,7 +292,7 @@ namespace VoicePresets {
         
         config.defaultAttack = 0.04f;
         config.defaultDecay = 0.14f;
-        config.defaultSustain = 0.5f;
+        config.defaultSustain = 0.2f;
         config.defaultRelease = 0.1f;
         
         return config;
@@ -302,20 +302,21 @@ namespace VoicePresets {
         VoiceConfig config;
         config.oscillatorCount = 3;
         config.oscWaveforms[0] = daisysp::Oscillator::WAVE_POLYBLEP_SQUARE;
-        config.oscWaveforms[1] = daisysp::Oscillator::WAVE_POLYBLEP_SQUARE;
+        config.oscWaveforms[1] = daisysp::Oscillator::WAVE_SIN;
         config.oscWaveforms[2] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
         config.oscAmplitudes[0] = 0.343f;
-        config.oscAmplitudes[1] = 0.343f;
+        config.oscAmplitudes[1] = 1.f;
         config.oscAmplitudes[2] = .34f;
         config.oscPulseWidth[0] = 0.69f;
         config.oscPulseWidth[1] = 0.23f;
           config.oscDetuning[0] = 0.0f;
-        config.oscDetuning[2] = 12.0f;
-        config.oscPulseWidth[1] = 0.3f; // Narrow pulse for bass
+          config.oscDetuning[0] = 0.0f;
+        config.oscDetuning[1] = 12.0f;
         config.filterRes = 0.42f;
         config.filterDrive = 3.0f;
         config.filterPassbandGain = 0.24f;
-        config.highPassFreq = 140.0f;
+        config.highPassFreq = 170.0f;
+
         config.filterMode = daisysp::LadderFilter::FilterMode::BP24;
 
         config.hasOverdrive = false;
@@ -335,13 +336,13 @@ namespace VoicePresets {
         config.oscWaveforms[0] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
         config.oscWaveforms[1] = daisysp::Oscillator::WAVE_POLYBLEP_TRI;
         config.oscWaveforms[2] = daisysp::Oscillator::WAVE_POLYBLEP_TRI;
-        config.oscAmplitudes[0] = .3f;
+        config.oscAmplitudes[0] = .4f;
         config.oscAmplitudes[1] = 1.f;
         config.oscAmplitudes[2] = 1.f;
-        config.oscDetuning[1] = -12.0f; // One octave down
-        config.oscDetuning[2] = -12.0f; // One octave down
+        config.oscDetuning[1] = -12.0002f; // One octave down
+        config.oscDetuning[2] = -11.9994f; // One octave down
         
-        config.filterRes = 0.5f;
+        config.filterRes = 0.3f;
         config.filterDrive = 2.7f;
         config.filterPassbandGain = 0.22f;
         config.highPassFreq = 66.0f; // Lower for bass
@@ -364,18 +365,18 @@ config.hasWavefolder = false;
         config.oscWaveforms[0] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
         config.oscWaveforms[1] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
         config.oscWaveforms[2] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
-        config.oscAmplitudes[0] = .55f;
-        config.oscAmplitudes[1] = .43f;
-        config.oscAmplitudes[2] = 0.43f;
+        config.oscAmplitudes[0] = .45f;
+        config.oscAmplitudes[1] = .33f;
+        config.oscAmplitudes[2] = 0.33f;
         config.oscDetuning[0] = 0.0f;
         config.oscDetuning[1] = 0.014f;  
         config.oscDetuning[2] = -0.014f;
         
         config.filterRes = 0.59f;
-        config.filterDrive = 3.2f;
+        config.filterDrive = 3.8f;
         config.filterPassbandGain = 0.33f;
         config.highPassFreq = 150.0f;
-        config.filterMode = daisysp::LadderFilter::FilterMode::LP36;
+        config.filterMode = daisysp::LadderFilter::FilterMode::LP24;
         config.hasOverdrive = false;
         config.hasWavefolder = false;
         config.overdriveAmount = 0.2f;
@@ -383,7 +384,7 @@ config.hasWavefolder = false;
         
         config.defaultAttack = 0.02f;
         config.defaultDecay = 0.2f;
-        config.defaultSustain = 0.2f;
+        config.defaultSustain = 0.1f;
         config.defaultRelease = 0.15f;
         
         return config;
@@ -395,9 +396,9 @@ config.hasWavefolder = false;
         config.oscWaveforms[0] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
         config.oscWaveforms[1] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
         config.oscWaveforms[2] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
-        config.oscAmplitudes[0] = 0.4f;
-        config.oscAmplitudes[1] = 0.4f;
-        config.oscAmplitudes[2] = 0.4f;
+        config.oscAmplitudes[0] = 0.3f;
+        config.oscAmplitudes[1] = 0.3f;
+        config.oscAmplitudes[2] = 0.3f;
         config.oscDetuning[0] = 0.0f;
         config.oscDetuning[1] = 12.0f;  // One octave up
         config.oscDetuning[2] = 7.0f;  // Perfect fifth above octave
@@ -406,7 +407,7 @@ config.hasWavefolder = false;
         config.filterDrive = 3.f;
         config.filterPassbandGain = 0.23f;
         config.highPassFreq = 160.0f;
-        config.filterMode = daisysp::LadderFilter::FilterMode::LP24; // Band-pass for percussive sound
+        config.filterMode = daisysp::LadderFilter::FilterMode::LP12; // Band-pass for percussive sound
 
         config.hasOverdrive = false;
         config.hasWavefolder = false;

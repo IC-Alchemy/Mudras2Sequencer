@@ -30,7 +30,6 @@ void initButtonManager(UIState& uiState) {
         uiState.padPressTimestamps[i] = 0;
     }
     
-    uiState.lfoAssignMode = false;
     uiState.delayOn = true;
     uiState.modGateParamSeqLengthsMode = false;
     uiState.slideMode = false;

@@ -1,5 +1,6 @@
 #include "includes.h"
 #include "diagnostic.h"
+#include "src/dsp/dsp.h"
 #include "src/voice/Voice.h"
 
 // =======================
@@ -26,7 +27,6 @@ uint8_t leadVoiceId = 0;
 uint8_t bassVoiceId = 0;
 
 // Global effects and delay (shared between voices)
-daisysp::Oscillator lfo1, lfo2;
 daisysp::Svf delLowPass;
 daisysp::DelayLine<float, MAX_DELAY_SAMPLES> del1;
 float feedbackGain1 = 0.65f;
@@ -59,9 +59,6 @@ float currentDelay = 48000.0f * .15f;
 float feedbackAmmount = 0.45f; // Safer initial feedback level
 const float FEEDBACK_FADE_RATE = 0.001f; // Faster fade to prevent feedback buildup
 
-
- float lfo1LEDWaveformValue = 0.0f; // Current LFO1 waveform value for smooth LED fade (-1.0 to 1.0)
- float lfo2LEDWaveformValue = 0.0f; // Current LFO2 waveform value for smooth LED fade (-1.0 to 1.0)
 
 
 // =======================
@@ -185,16 +182,6 @@ void initOscillators()
     delLowPass.SetRes(0.19f);
     delLowPass.SetDrive(.9f);
 
-    lfo1.Init(SAMPLE_RATE);
-    lfo1.SetWaveform(daisysp::Oscillator::WAVE_TRI);
-    lfo1.SetFreq(0.5f);
-    lfo1.SetAmp(0.5f);
-    
-    lfo2.Init(SAMPLE_RATE);
-    lfo2.SetWaveform(daisysp::Oscillator::WAVE_TRI);
-    lfo2.SetFreq(0.5f);
-    lfo2.SetAmp(0.5f);
-
     del1.Init();
     del1.Reset(); // Clear any garbage in delay buffer
     const float delayMs1 = 500.f;
@@ -270,13 +257,13 @@ void applyEnvelopeParameters(const  VoiceState &state, daisysp::Adsr &env, int v
     if (voiceNum == 1)
     {
         attack = daisysp::fmap(state.attack, 0.005f, 0.75f, daisysp::Mapping::LINEAR);
-        release = daisysp::fmap(state.decay, 0.01f, .6f, daisysp::Mapping::LINEAR);
-        env.SetDecayTime(.1f + (release*.75));
+        release = daisysp::fmap(state.decay, 0.001f, .6f, daisysp::Mapping::LINEAR);
+        env.SetDecayTime(.01f + (release*.75));
     }
     else
     {
         attack = daisysp::fmap(state.attack, 0.005f, 0.754f, daisysp::Mapping::LINEAR);
-        release = daisysp::fmap(state.decay, 0.01f, .6f, daisysp::Mapping::LINEAR);
+        release = daisysp::fmap(state.decay, 0.001f, .6f, daisysp::Mapping::LINEAR);
         env.SetDecayTime(.01f + (release * 0.25f));
     }
 
@@ -292,7 +279,7 @@ void applyEnvelopeParameters(const  VoiceState &state, daisysp::Adsr &env, int v
  */
 float calculateFilterFrequency(float filterValue)
 {
-    return daisysp::fmap(filterValue, 100.0f, 6710.0f, daisysp::Mapping::EXP);
+    return daisysp::fmap(filterValue, 100.0f, 9710.0f, daisysp::Mapping::EXP);
 }
 
 
@@ -409,7 +396,7 @@ void updateVoiceParameters(
     {
         // Calculate base frequency for the voice
         int noteIndex = state.note;
-        float baseFreq = daisysp::mtof(scale[currentScale][noteIndex] + 48 + state.octave);
+        float baseFreq = daisysp::mtof(scale[currentScale][noteIndex] + 36 + state.octave);
         
         // Update voice frequency through VoiceManager
         voiceManager->setVoiceFrequency(voiceId, baseFreq);
@@ -463,10 +450,7 @@ void onStepCallback(uint32_t uClockCurrentStep)
 {
     currentSequencerStep = static_cast<uint8_t>(uClockCurrentStep); // Raw uClock step, sequencers handle their own modulo
     
-    // OPTIMIZATION: Use cached LFO values instead of processing in sequencer thread
-    // LFO values are now updated in audio thread for better performance
-    float lfo1Value = lfo1LEDWaveformValue * globalLFOs.lfo1amp;
-    float lfo2Value = lfo2LEDWaveformValue * globalLFOs.lfo2amp;
+   
     
     // 2. Advance sequencers and get their new state into local temporary variables.
     // FIXED: Make distance sensor parameter recording voice-specific to prevent parameter sharing
@@ -486,8 +470,8 @@ void onStepCallback(uint32_t uClockCurrentStep)
         Serial.println(uiState.isVoice2Mode);
     }
     
-    seq1.advanceStep(uClockCurrentStep, voice1Distance, uiState, &tempState1, lfo1Value, lfo2Value);
-    seq2.advanceStep(uClockCurrentStep, voice2Distance, uiState, &tempState2, lfo1Value, lfo2Value);
+    seq1.advanceStep(uClockCurrentStep, voice1Distance, uiState, &tempState1);
+    seq2.advanceStep(uClockCurrentStep, voice2Distance, uiState, &tempState2);
     applyAS5600DelayValues();
 
     // 3. Apply AS5600 base values with correct voice IDs to prevent parameter sharing
@@ -497,8 +481,6 @@ void onStepCallback(uint32_t uClockCurrentStep)
     // Apply AS5600 base values to global delay effect parameters
     applyAS5600DelayValues();
 
-    // Apply AS5600 base values to global LFO parameters
-    applyAS5600LFOValues();
 
     // 4. Update synth hardware directly using the unified voice parameter function.
     updateVoiceParameters(tempState1, false, true, &GATE1, &gateTimer1);
@@ -528,17 +510,7 @@ void fill_audio_buffer(audio_buffer_t *buffer)
     // Set delay time once per buffer
     del1.SetDelay(currentDelay);
     
-    // OPTIMIZATION: Process LFOs only once per buffer instead of per sample
-    // This eliminates ~40% CPU waste in audio callback
-    static int lfoSampleCounter = 0;
-    if (lfoSampleCounter <= 0) {
-        // Process LFOs every 64 samples for LED updates
-        lfo1LEDWaveformValue = lfo1.Process();
-        lfo2LEDWaveformValue = lfo2.Process();
-        lfoSampleCounter = 64;
-    }
-    lfoSampleCounter -= N;
-    
+
     for (int i = 0; i < N; ++i)
     {
         // Process all voices efficiently (voice states are updated by sequencer callbacks)
@@ -546,10 +518,10 @@ void fill_audio_buffer(audio_buffer_t *buffer)
 
         // Process delay effect
         output = processDelayEffect(finalvoice);
-
+        float softLimitedOutput = daisysp::SoftLimit(output);
         // Output to stereo channels
-        out[2 * i + 0] = convertSampleToInt16(output * 0.5f);
-        out[2 * i + 1] = convertSampleToInt16(output * 0.5f);
+        out[2 * i + 0] = convertSampleToInt16(softLimitedOutput * 0.5f);
+        out[2 * i + 1] = convertSampleToInt16(softLimitedOutput * 0.5f);
     }
 
     buffer->sample_count = N;
@@ -570,8 +542,7 @@ float processDelayEffect(float inputSignal)
     
     // Write to delay line: dry input + filtered feedback
     // Clamp feedback to prevent runaway
-    filteredFeedback = std::max(-1.0f, std::min(filteredFeedback, .9f));
-    del1.Write(inputSignal + filteredFeedback);
+    del1.Write(inputSignal + (filteredFeedback*.75f));
     
     // Mix dry and wet signals
     return inputSignal + (delout * currentDelayOutputGain);
@@ -824,7 +795,6 @@ void loop1()
 
         updateStepLEDs(ledMatrix, seq1, seq2, uiState, mm);
         display.update(uiState, seq1, seq2);
-        // LFO LED pulse states are updated directly in fill_audio_buffer()
 
         updateControlLEDs(ledMatrix, uiState);  
         ledMatrix.show();

@@ -77,7 +77,7 @@ This module, comprised of `AS5600Manager.h` and `AS5600Manager.cpp`, centralizes
 #### Key Features
 
 - **Bidirectional Velocity-Sensitive Control**: The speed and direction of the encoder's rotation are used to modify parameter values.
-- **Parameter Application**: Applies encoder values to voice, delay, and LFO parameters.
+- **Parameter Application**: Applies encoder values to voice and delay parameters.
 - **Thread-Safe**: Designed to work in a dual-core environment, with thread-safe communication between cores.
 - **Range Clamping**: Ensures that parameter values stay within their valid ranges.
 

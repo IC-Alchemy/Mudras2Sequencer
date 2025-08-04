@@ -238,7 +238,7 @@ The new VoiceManager architecture provides:
 ### Real-Time Effects Processing
 - **Stereo Delay**: Tempo-synced delay with feedback control
 - **State Variable Filter**: Low-pass, high-pass, and band-pass modes
-- **LFO Integration**: Two independent LFOs per voice
+
 - **Overdrive & Wavefolder**: Analog-style saturation and wave shaping
 
 ### Memory Architecture

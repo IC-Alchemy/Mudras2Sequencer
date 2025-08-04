@@ -24,8 +24,7 @@ static bool handleParameterButtonEvent(const MatrixButtonEvent &evt,
 static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
                                   UIState &uiState, Sequencer &seq1,
                                   Sequencer &seq2);
-static void handleLFOAssignment(uint8_t buttonIndex, UIState &uiState,
-                                Sequencer &seq1, Sequencer &seq2);
+
 static void autoSelectAS5600Parameter(ParamId paramId, UIState &uiState);
 static void handleAS5600ParameterControl(UIState &uiState);
 static void handleControlButtonEvent(uint8_t buttonIndex, UIState &uiState,
@@ -45,15 +44,7 @@ void matrixEventHandler(const MatrixButtonEvent &evt, UIState &uiState,
   // Check and trigger any pending long-press resets immediately
   pollUIHeldButtons(uiState, seq1, seq2);
 
-  // Handle LFO assignment mode
-  if (uiState.lfoAssignMode) {
-    if (evt.type == MATRIX_BUTTON_PRESSED) {
-      handleLFOAssignment(evt.buttonIndex, uiState, seq1, seq2);
-      uiState.lfoAssignMode = false;
-      Serial.println("Exited LFO assignment mode");
-    }
-    return; // Exit after handling
-  }
+
   // Handle Slide Mode toggle (Button 22)
   if (evt.buttonIndex == BUTTON_SLIDE_MODE) {
     if (evt.type == MATRIX_BUTTON_PRESSED) {
@@ -90,10 +81,8 @@ void matrixEventHandler(const MatrixButtonEvent &evt, UIState &uiState,
       uiState.button24WasPressed = false;
 
       if (isLongPress(pressDuration)) {
-        uiState.lfoAssignMode = true;
-        Serial.print("Entered LFO assignment mode for ");
-        Serial.println(uiState.isVoice2Mode ? "LFO2 (Voice 2)"
-                                            : "LFO1 (Voice 1)");
+        // Long press functionality removed - LFOs no longer supported
+        Serial.println("Long press functionality removed - LFOs no longer supported");
       } else {
         midiNoteManager.onModeSwitch();
         uiState.isVoice2Mode = !uiState.isVoice2Mode;
@@ -253,9 +242,11 @@ static bool handleParameterButtonEvent(const MatrixButtonEvent &evt,
       if (pressed && mapping.paramId != ParamId::Note) {
         autoSelectAS5600Parameter(mapping.paramId, uiState);
       }
-      
-      // In edit mode, toggle parameter editing instead of requiring continuous holding
-      if (pressed && uiState.selectedStepForEdit >= 0 && mapping.paramId != ParamId::Note) {
+
+      // In edit mode, toggle parameter editing instead of requiring continuous
+      // holding
+      if (pressed && uiState.selectedStepForEdit >= 0 &&
+          mapping.paramId != ParamId::Note) {
         if (uiState.currentEditParameter == mapping.paramId) {
           // Toggle off - stop editing this parameter
           uiState.currentEditParameter = ParamId::Count;
@@ -348,10 +339,11 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
 
       if (isLongPress(pressDuration)) {
         // Toggle step selection for editing
-        //Single step is now selected for editting
+        // Single step is now selected for editting
         if (uiState.selectedStepForEdit == evt.buttonIndex) {
           uiState.selectedStepForEdit = -1;
-          uiState.currentEditParameter = ParamId::Count; // Clear edit parameter when exiting edit mode
+          uiState.currentEditParameter =
+              ParamId::Count; // Clear edit parameter when exiting edit mode
         } else {
           uiState.selectedStepForEdit = evt.buttonIndex;
         }
@@ -359,7 +351,8 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
         // Short press toggles step (on/off) and exits edit mode
         currentActiveSeq.toggleStep(evt.buttonIndex);
         uiState.selectedStepForEdit = -1;
-        uiState.currentEditParameter = ParamId::Count; // Clear edit parameter when exiting edit mode
+        uiState.currentEditParameter =
+            ParamId::Count; // Clear edit parameter when exiting edit mode
       }
     }
   }
@@ -372,7 +365,8 @@ static void handleControlButtonEvent(uint8_t buttonIndex, UIState &uiState,
   case BUTTON_SLIDE_MODE:
     uiState.slideMode = !uiState.slideMode;
     uiState.selectedStepForEdit = -1;
-    uiState.currentEditParameter = ParamId::Count; // Clear edit parameter when exiting edit mode
+    uiState.currentEditParameter =
+        ParamId::Count; // Clear edit parameter when exiting edit mode
     Serial.print("Slide mode ");
     Serial.println(uiState.slideMode ? "ON" : "OFF");
     break;
@@ -394,72 +388,50 @@ static void handleControlButtonEvent(uint8_t buttonIndex, UIState &uiState,
       }
       uiState.flash25Until = millis() + CONTROL_LED_FLASH_DURATION_MS;
     }
-  break;
-case BUTTON_CHANGE_SCALE:
-  currentScale = (currentScale + 1) % 7;
-  Serial.print("Scale changed to: ");
-  Serial.print(currentScale);
-  Serial.print(" (");
-  Serial.print(scaleNames[currentScale]);
-  Serial.println(")");
-  break;
-case BUTTON_CHANGE_THEME:
-  uiState.currentThemeIndex =
-      (uiState.currentThemeIndex + 1) % static_cast<int>(LEDTheme::COUNT);
-  setLEDTheme(static_cast<LEDTheme>(uiState.currentThemeIndex));
-  break;
-case BUTTON_CHANGE_SWING_PATTERN:
-  uiState.currentShufflePatternIndex =
-      (uiState.currentShufflePatternIndex + 1) % NUM_SHUFFLE_TEMPLATES;
-  {
-    const ShuffleTemplate &currentTemplate =
-        shuffleTemplates[uiState.currentShufflePatternIndex];
+    break;
+  case BUTTON_CHANGE_SCALE:
+    currentScale = (currentScale + 1) % 7;
+    Serial.print("Scale changed to: ");
+    Serial.print(currentScale);
+    Serial.print(" (");
+    Serial.print(scaleNames[currentScale]);
+    Serial.println(")");
+    break;
+  case BUTTON_CHANGE_THEME:
+    uiState.currentThemeIndex =
+        (uiState.currentThemeIndex + 1) % static_cast<int>(LEDTheme::COUNT);
+    setLEDTheme(static_cast<LEDTheme>(uiState.currentThemeIndex));
+    break;
+  case BUTTON_CHANGE_SWING_PATTERN:
+    uiState.currentShufflePatternIndex =
+        (uiState.currentShufflePatternIndex + 1) % NUM_SHUFFLE_TEMPLATES;
+    {
+      const ShuffleTemplate &currentTemplate =
+          shuffleTemplates[uiState.currentShufflePatternIndex];
 
-    // Apply shuffle template to uClock
-    uClock.setShuffleTemplate(const_cast<int8_t *>(currentTemplate.ticks),
-                              SHUFFLE_TEMPLATE_SIZE);
-    uClock.setShuffle(uiState.currentShufflePatternIndex >
-                      0); // Enable shuffle if not "No Shuffle"
+      // Apply shuffle template to uClock
+      uClock.setShuffleTemplate(const_cast<int8_t *>(currentTemplate.ticks),
+                                SHUFFLE_TEMPLATE_SIZE);
+      uClock.setShuffle(uiState.currentShufflePatternIndex >
+                        0); // Enable shuffle if not "No Shuffle"
 
-    Serial.print("Shuffle pattern changed to index ");
-    Serial.print(uiState.currentShufflePatternIndex);
-    Serial.print(": ");
-    Serial.println(currentTemplate.name);
-  }
-  break;
-
-case BUTTON_TOGGLE_DELAY:
-  uiState.delayOn = !uiState.delayOn;
-  uiState.flash23Until = millis() + CONTROL_LED_FLASH_DURATION_MS;
-  if (uiState.delayOn) {
-    uiState.currentAS5600Parameter = AS5600ParameterMode::DelayTime;
-    Serial.println("Delay ON - AS5600 set to Delay Time");
-  } else {
-    Serial.println("Delay OFF");
-  }
-  break;
-}
-}
-
-static void handleLFOAssignment(uint8_t buttonIndex, UIState &uiState,
-                                Sequencer &seq1, Sequencer &seq2) {
-  Sequencer &currentActiveSeq = uiState.isVoice2Mode ? seq2 : seq1;
-  ParamId paramId = ParamId::Count;
-
-  for (size_t i = 0; i < PARAM_BUTTON_MAPPINGS_SIZE; ++i) {
-    if (PARAM_BUTTON_MAPPINGS[i].buttonIndex == buttonIndex) {
-      paramId = PARAM_BUTTON_MAPPINGS[i].paramId;
-      break;
+      Serial.print("Shuffle pattern changed to index ");
+      Serial.print(uiState.currentShufflePatternIndex);
+      Serial.print(": ");
+      Serial.println(currentTemplate.name);
     }
-  }
+    break;
 
-  if (paramId != ParamId::Count) {
-    uint8_t lfoNum = uiState.isVoice2Mode ? 2 : 1;
-    currentActiveSeq.assignLFO(lfoNum, paramId);
-    Serial.print("Assigned LFO");
-    Serial.print(lfoNum);
-    Serial.print(" to ");
-    Serial.println(CORE_PARAMETERS[static_cast<int>(paramId)].name);
+  case BUTTON_TOGGLE_DELAY:
+    uiState.delayOn = !uiState.delayOn;
+    uiState.flash23Until = millis() + CONTROL_LED_FLASH_DURATION_MS;
+    if (uiState.delayOn) {
+      uiState.currentAS5600Parameter = AS5600ParameterMode::DelayTime;
+      Serial.println("Delay ON - AS5600 set to Delay Time");
+    } else {
+      Serial.println("Delay OFF");
+    }
+    break;
   }
 }
 
@@ -467,6 +439,9 @@ static void autoSelectAS5600Parameter(ParamId paramId, UIState &uiState) {
   AS5600ParameterMode newAS5600Param;
   bool isValid = true;
   switch (paramId) {
+  case ParamId::Note:
+    newAS5600Param = AS5600ParameterMode::Note;
+    break;
   case ParamId::Velocity:
     newAS5600Param = AS5600ParameterMode::Velocity;
     break;
@@ -500,6 +475,9 @@ static void handleAS5600ParameterControl(UIState &uiState) {
 
   Serial.print("AS5600 parameter switched to: ");
   switch (uiState.currentAS5600Parameter) {
+  case AS5600ParameterMode::Note:
+    Serial.println("Note");
+    break;
   case AS5600ParameterMode::Velocity:
     Serial.println("Velocity");
     break;
@@ -518,18 +496,7 @@ static void handleAS5600ParameterControl(UIState &uiState) {
   case AS5600ParameterMode::DelayFeedback:
     Serial.println("Delay Feedback");
     break;
-  case AS5600ParameterMode::LFO1freq:
-    Serial.println("LFO1 Frequency");
-    break;
-  case AS5600ParameterMode::LFO1amp:
-    Serial.println("LFO1 Amplitude");
-    break;
-  case AS5600ParameterMode::LFO2freq:
-    Serial.println("LFO2 Frequency");
-    break;
-  case AS5600ParameterMode::LFO2amp:
-    Serial.println("LFO2 Amplitude");
-    break;
+
   case AS5600ParameterMode::COUNT:
     break; // Should not happen
   }

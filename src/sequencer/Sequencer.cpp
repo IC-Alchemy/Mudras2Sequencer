@@ -56,7 +56,7 @@ float mapNormalizedValueToParamRange(ParamId id, float normalizedValue)
 }
 
 Sequencer::Sequencer()
-    : running(false), currentStep(0), lastNote(-1), currentNote(-1), noteDurationCounter(0), channel(0), parameterManager(), lfo1Target(ParamId::Count), lfo2Target(ParamId::Count), previousStepHadSlide(false) // Initialize parameterManager explicitly
+    : running(false), currentStep(0), lastNote(-1), currentNote(-1), noteDurationCounter(0), channel(0), parameterManager(), previousStepHadSlide(false) // Initialize parameterManager explicitly
       ,
       envelope() // Initialize envelope explicitly
       ,
@@ -179,7 +179,7 @@ void Sequencer::advanceStep(uint8_t current_uclock_step, int mm_distance,
                             bool is_filter_button_held, bool is_attack_button_held,
                             bool is_decay_button_held, bool is_octave_button_held,
                             int current_selected_step_for_edit,
-                             VoiceState *voiceState, float lfo1Value, float lfo2Value)
+                             VoiceState *voiceState)
 {
     if (!running)
     {
@@ -264,15 +264,14 @@ void Sequencer::advanceStep(uint8_t current_uclock_step, int mm_distance,
 
     // Process the step with current parameter values (including any newly recorded ones)
     // Use UINT8_MAX to signal that per-parameter step indices should be used
-    processStep(UINT8_MAX, voiceState, lfo1Value, lfo2Value);
+    processStep(UINT8_MAX, voiceState);
 
     // If parameters were recorded during this step, the voice state is already updated
     // with the new values by processStep() above, providing immediate real-time feedback
 }
 
 void Sequencer::advanceStep(uint8_t current_uclock_step, int mm_distance,
-                            const UIState& uiState, VoiceState *voiceState,
-                            float lfo1Value, float lfo2Value)
+                            const UIState& uiState, VoiceState *voiceState)
 {
     // Extract button states from UIState and call the main advanceStep method
     advanceStep(current_uclock_step, mm_distance,
@@ -283,10 +282,10 @@ void Sequencer::advanceStep(uint8_t current_uclock_step, int mm_distance,
                 uiState.parameterButtonHeld[static_cast<int>(ParamId::Decay)],
                 uiState.parameterButtonHeld[static_cast<int>(ParamId::Octave)],
                 uiState.selectedStepForEdit,
-                voiceState, lfo1Value, lfo2Value);
+                voiceState);
 }
 
-void Sequencer::processStep(uint8_t stepIdx,  VoiceState *voiceState, float lfo1Value, float lfo2Value)
+void Sequencer::processStep(uint8_t stepIdx, VoiceState *voiceState)
 {
     // This method supports two modes:
     // 1. When stepIdx == UINT8_MAX, use per-parameter step indices (called from advanceStep)
@@ -335,34 +334,7 @@ void Sequencer::processStep(uint8_t stepIdx,  VoiceState *voiceState, float lfo1
     float gateLengthProportion = getStepParameterValue(ParamId::GateLength,
         usePerParameterIndices ? currentStepPerParam[static_cast<size_t>(ParamId::GateLength)] : stepIdx);
 
-    // Apply LFO modulation
-    if (lfo1Target != ParamId::Count) {
-        float* targetParam = nullptr;
-        switch (lfo1Target) {
-            case ParamId::Velocity: targetParam = &velocityVal; break;
-            case ParamId::Filter: targetParam = &filterVal; break;
-            case ParamId::Attack: targetParam = &attackVal; break;
-            case ParamId::Decay: targetParam = &decayVal; break;
-            default: break;
-        }
-        if (targetParam) {
-            *targetParam = std::max(0.0f, std::min(*targetParam + lfo1Value, 1.0f));
-        }
-    }
 
-    if (lfo2Target != ParamId::Count) {
-        float* targetParam = nullptr;
-        switch (lfo2Target) {
-            case ParamId::Velocity: targetParam = &velocityVal; break;
-            case ParamId::Filter: targetParam = &filterVal; break;
-            case ParamId::Attack: targetParam = &attackVal; break;
-            case ParamId::Decay: targetParam = &decayVal; break;
-            default: break;
-        }
-        if (targetParam) {
-            *targetParam = std::max(0.0f, std::min(*targetParam + lfo2Value, 1.0f));
-        }
-    }
 
     const uint16_t noteDurationTicks = static_cast<uint16_t>(std::max(1.0f, gateLengthProportion * PULSES_PER_SEQUENCER_STEP));
     const int8_t octaveOffset = mapFloatToOctaveOffset(octaveFloat);
@@ -494,12 +466,12 @@ void Sequencer::tickNoteDuration( VoiceState* voiceState)
     }
 }
 
-void Sequencer::playStepNow(uint8_t stepIdx,  VoiceState *voiceState, float lfo1Value, float lfo2Value)
+void Sequencer::playStepNow(uint8_t stepIdx, VoiceState *voiceState)
 {
     // This method is the public entry point for previewing a step.
     // It processes the step's parameters, updates the provided voice state,
     // and triggers the note's envelope.
-    processStep(stepIdx, voiceState, lfo1Value, lfo2Value);
+    processStep(stepIdx, voiceState);
 }
 void Sequencer::toggleStep(uint8_t stepIdx)
 {
@@ -553,16 +525,4 @@ void Sequencer::releaseEnvelope()
 void Sequencer::setMidiNoteOffCallback(void (*callback)(uint8_t note, uint8_t channel))
 {
     midiNoteOffCallback = callback;
-}
-
-void Sequencer::assignLFO(uint8_t lfo, ParamId paramId)
-{
-    if (lfo == 1)
-    {
-        lfo1Target = paramId;
-    }
-    else if (lfo == 2)
-    {
-        lfo2Target = paramId;
-    }
 }

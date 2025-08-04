@@ -22,7 +22,6 @@ extern UIState uiState;
 // Note: currentAS5600Parameter is now accessed via uiState.currentAS5600Parameter
 AS5600BaseValuesVoice1 as5600BaseValuesVoice1;
 AS5600BaseValuesVoice1 as5600BaseValuesVoice2;
-GlobalLFOParams globalLFOs; // Definition of the global LFO parameters
 unsigned long lastAS5600ButtonPress = 0;
 
 // Flash speed zones for dynamic boundary proximity feedback
@@ -52,13 +51,7 @@ float getParameterMinValue(AS5600ParameterMode param)
         return 120.0f; // 10ms minimum delay (480 samples at 48kHz)
     case AS5600ParameterMode::DelayFeedback:
         return 0.0f;
-    case AS5600ParameterMode::LFO1freq:
-        return 0.0001f;
-    case AS5600ParameterMode::LFO2freq:
-        return 0.0001f; // 0.1Hz minimum LFO frequency
-    case AS5600ParameterMode::LFO1amp:
-    case AS5600ParameterMode::LFO2amp:
-        return 0.0f; // 0% minimum amplitude
+
     default:
         return 0.0f;
     }
@@ -80,12 +73,7 @@ float getParameterMaxValue(AS5600ParameterMode param)
         return MAX_DELAY_SAMPLES * .85f; // Maximum delay in samples (1.8 seconds)
     case AS5600ParameterMode::DelayFeedback:
         return 0.91f; // Maximum 95% feedback to prevent excessive feedback
-    case AS5600ParameterMode::LFO1freq:
-    case AS5600ParameterMode::LFO2freq:
-        return 20.0f; // Maximum 20 Hz LFO frequency
-    case AS5600ParameterMode::LFO1amp:
-    case AS5600ParameterMode::LFO2amp:
-        return 1.0f; // Maximum 100% LFO amplitude
+
     default:
         return 1.0f;
     }
@@ -96,12 +84,11 @@ float getAS5600BaseValueRange(AS5600ParameterMode param)
     // Return the allowed range for AS5600 base values
     float fullRange = getParameterMaxValue(param) - getParameterMinValue(param);
 
-    // Delay and LFO parameters use full range without restrictions
-    if (param == AS5600ParameterMode::DelayTime || param == AS5600ParameterMode::DelayFeedback ||
-        param == AS5600ParameterMode::LFO1freq || param == AS5600ParameterMode::LFO1amp ||
-        param == AS5600ParameterMode::LFO2freq || param == AS5600ParameterMode::LFO2amp)
+    // Delay parameters use full range without restrictions
+    if (param == AS5600ParameterMode::DelayTime || param == AS5600ParameterMode::DelayFeedback)
+   
     {
-        return fullRange; // Full range for delay and LFO parameters
+        return fullRange; // Full range for delay parameters
     }
 
     // Other parameters use reduced range to leave room for sequencer values
@@ -234,18 +221,7 @@ void applyIncrementToParameter(AS5600BaseValues *baseValues, AS5600ParameterMode
     case AS5600ParameterMode::DelayFeedback:
         targetValue = &baseValues->delayFeedback;
         break;
-    case AS5600ParameterMode::LFO1freq:
-        targetValue = &globalLFOs.lfo1freq;
-        break;
-    case AS5600ParameterMode::LFO1amp:
-        targetValue = &globalLFOs.lfo1amp;
-        break;
-    case AS5600ParameterMode::LFO2freq:
-        targetValue = &globalLFOs.lfo2freq;
-        break;
-    case AS5600ParameterMode::LFO2amp:
-        targetValue = &globalLFOs.lfo2amp;
-        break;
+
     default:
         return; // Invalid parameter
     }
@@ -265,7 +241,7 @@ void applyIncrementToParameter(AS5600BaseValues *baseValues, AS5600ParameterMode
         float maxRange = getAS5600BaseValueRange(param);
         *targetValue = std::max(-maxRange, std::min(newValue, maxRange));
     }
-    // For unidirectional parameters (delay and LFO)
+    // For unidirectional parameters (delay)
     else
     {
         float minVal = getParameterMinValue(param);
@@ -444,34 +420,7 @@ void applyAS5600DelayValues()
     */
 }
 
-/**
- * Apply AS5600 magnetic encoder values to global LFO parameters.
- * Direct parameter control: LFO parameters use full range without restrictions.
- * Thread-safe communication for Core0 audio processing.
- */
-void applyAS5600LFOValues()
-{
-    if (!as5600Sensor.isConnected())
-    {
-        return;
-    }
 
-    // Apply LFO frequencies directly from the global LFO struct
-    lfo1.SetFreq(globalLFOs.lfo1freq);
-    lfo2.SetFreq(globalLFOs.lfo2freq);
-
-    // Debug output for LFO parameter updates (uncomment for debugging)
-/*
-    Serial.print("LFO Update - LFO1freq: ");
-    Serial.print(globalLFOs.lfo1freq, 2);
-    Serial.print("Hz, LFO1amp: ");
-    Serial.print(globalLFOs.lfo1amp, 3);
-    Serial.print(", LFO2freq: ");
-    Serial.print(globalLFOs.lfo2freq, 2);
-    Serial.print("Hz, LFO2amp: ");
-    Serial.println(globalLFOs.lfo2amp, 3);
-    */
-}
 
 // =======================
 //   AS5600 HELPER FUNCTIONS (moved from main file)
@@ -512,18 +461,7 @@ float getAS5600ParameterValue()
     case AS5600ParameterMode::DelayFeedback:
         value = activeBaseValues->delayFeedback;
         break;
-    case AS5600ParameterMode::LFO1freq:
-        value = globalLFOs.lfo1freq;
-        break;
-    case AS5600ParameterMode::LFO1amp:
-        value = globalLFOs.lfo1amp;
-        break;
-    case AS5600ParameterMode::LFO2freq:
-        value = globalLFOs.lfo2freq;
-        break;
-    case AS5600ParameterMode::LFO2amp:
-        value = globalLFOs.lfo2amp;
-        break;
+   
     }
 
     // Normalize the value to a 0.0-1.0 range for LED feedback
@@ -566,11 +504,6 @@ void initAS5600BaseValues()
     as5600BaseValuesVoice2.delayTime = 48000.0f * 0.2f; // 200ms default delay for voice2
     as5600BaseValuesVoice2.delayFeedback = 0.55f;       // 55% default feedback for voice2
 
-    // LFO parameters start with reasonable defaults
-    globalLFOs.lfo1freq = .01f;   // 1Hz default
-    globalLFOs.lfo1amp = 0.0f;  // No modulation initially
-    globalLFOs.lfo2freq = .01f; // 2Hz default
-    globalLFOs.lfo2amp = 0.0f;  // No modulation initially
 }
 
 /**
@@ -591,7 +524,7 @@ void resetAS5600BaseValues(UIState& uiState, bool currentVoiceOnly)
         activeBaseValues->attack = 0.0f;
         activeBaseValues->decay = 0.0f;
 
-        // LFO parameters are global and not reset with this function
+        // Delay parameters are global and not reset with this function
     }
     else
     {

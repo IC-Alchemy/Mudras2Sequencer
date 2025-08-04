@@ -37,7 +37,6 @@ void updateAS5600BaseValues(UIState& uiState);
 void updateAS5600StepParameterValues(UIState& uiState);
 void applyAS5600BaseValues(VoiceState *voiceState, uint8_t voiceId);
 void applyAS5600DelayValues();
-void applyAS5600LFOValues();
 float getParameterMinValue(AS5600ParameterMode param);
 float getParameterMaxValue(AS5600ParameterMode param);
 float getAS5600BaseValueRange(AS5600ParameterMode param);
@@ -57,22 +56,12 @@ void initAS5600BaseValues();
 
 extern AS5600Sensor as5600Sensor;
 
-// Define a new structure for global LFO parameters
-struct GlobalLFOParams {
-    float lfo1freq;
-    float lfo1amp;
-    float lfo2freq;
-    float lfo2amp;
-};
-
-extern GlobalLFOParams globalLFOs;
 
 extern AS5600BaseValuesVoice1 as5600BaseValuesVoice1;
 extern AS5600BaseValuesVoice1 as5600BaseValuesVoice2;
 extern float delayTarget;
 extern float feedbackAmmount;
-extern daisysp::Oscillator lfo1;
-extern daisysp::Oscillator lfo2;
+
 extern const size_t MAX_DELAY_SAMPLES;
 
 

@@ -34,10 +34,6 @@ namespace ControlLEDs
     // Delay parameter LEDs (AS5600 encoder control)
     constexpr int DELAY_TIME_LED = 40;      // Position (0,6)
     constexpr int DELAY_FEEDBACK_LED = 41;  // Position (0,7)
-    constexpr int LFO1_FREQ_LED = 42;      // Position (0,6)
-    constexpr int LFO1_AMP_LED = 43;       // Position (0,7)
-    constexpr int LFO2_FREQ_LED = 44;      // Position (0,6)
-    constexpr int LFO2_AMP_LED = 45;       // Position (0,7)
 
 
     // Mode indicator LEDs
@@ -56,9 +52,6 @@ namespace ControlLEDs
 //   EXTERNAL DEPENDENCIES
 // =======================
 
-// LFO LED high-resolution waveform synchronization variables
-extern  float lfo1LEDWaveformValue; // LFO1 waveform value (-1.0 to 1.0)
-extern  float lfo2LEDWaveformValue; // LFO2 waveform value (-1.0 to 1.0)
 
 // External function declarations
 extern float getAS5600ParameterValue();

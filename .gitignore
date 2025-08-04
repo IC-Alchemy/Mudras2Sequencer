@@ -18,4 +18,5 @@ DOCUMENTATION_OVERVIEW.md
 .gitignore
 QUICK_START.md
 src/sequencer/sequencerREADME.md
-src/sequencer/sequencerREADME.md
+API_REFERENCE.md
+CONTRIBUTING.md

@@ -1,6 +1,6 @@
-# Sequencer Module
+# Polyrhythmic Step Sequencer
 
-The Sequencer module implements the polyrhythmic step sequencer core for the PicoMudrasSequencer, enabling independent parameter track sequencing with real-time gesture control. Each parameter (Note, Velocity, Filter, Attack, Decay, Octave, GateLength, Gate, Slide) operates as an independent track with configurable step counts, creating complex evolving patterns.
+A sophisticated step sequencer that treats each parameter as an independent track, enabling complex polyrhythmic patterns and real-time parameter recording. This module forms the core timing and parameter management system for the PicoMudrasSequencer. Each parameter (Note, Velocity, Filter, Attack, Decay, Octave, GateLength, Gate, Slide) operates as an independent track with configurable step counts, creating complex evolving patterns.
 
 ---
 
