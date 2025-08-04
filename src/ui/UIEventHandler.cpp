@@ -80,7 +80,7 @@ void matrixEventHandler(const MatrixButtonEvent &evt, UIState &uiState,
         Serial.print("Switched to Voice ");
         Serial.println(uiState.isVoice2Mode ? "2" : "1");
       }
-    }
+    
     return; // Exit after handling
   }
 

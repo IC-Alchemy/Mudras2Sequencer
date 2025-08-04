@@ -20,3 +20,6 @@ QUICK_START.md
 src/sequencer/sequencerREADME.md
 API_REFERENCE.md
 CONTRIBUTING.md
+docs/ParameterControlEnhancements.md
+src/LEDMatrix/SETTINGS_LED_FEEDBACK.md
+VOICE_EXPANSION_PLAN.md

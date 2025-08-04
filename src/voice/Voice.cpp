@@ -116,7 +116,7 @@ float Voice::process() {
     float envelopeValue = envelope.Process(gate);
     
     // Update filter frequency with envelope modulation
-    filter.SetFreq(filterFrequency * envelopeValue);
+    filter.SetFreq(100.f+(filterFrequency * envelopeValue)+(filterFrequency*.1f));
     
     // Process frequency slewing for slide functionality
     if (state.slide) {
@@ -128,13 +128,19 @@ float Voice::process() {
     
     // Mix oscillators
     float mixedOscillators = 0.0f;
-    for (size_t i = 0; i < oscillators.size(); i++) {
-        if (i < 3 && config.oscWaveforms[i] == VoiceConfig::WAVE_NOISE) {
-            // Use noise generator for this oscillator
-            mixedOscillators += noise_.Process() * config.oscAmplitudes[i];
-        } else {
-            // Use regular oscillator
-            mixedOscillators += oscillators[i].Process();
+    
+    // Special case for percussion voices (no oscillators, only noise)
+    if (config.oscillatorCount == 0) {
+        mixedOscillators = noise_.Process() * config.oscAmplitudes[0];
+    } else {
+        for (size_t i = 0; i < oscillators.size(); i++) {
+            if (i == 0 && config.oscWaveforms[i] == VoiceConfig::WAVE_NOISE) {
+                // Only multiply first oscillator with noise generator
+                mixedOscillators += oscillators[i].Process() * noise_.Process() * config.oscAmplitudes[i];
+            } else {
+                // Use regular oscillator
+                mixedOscillators += oscillators[i].Process() * config.oscAmplitudes[i];
+            }
         }
     }
     
@@ -164,7 +170,7 @@ void Voice::updateParameters(const VoiceState& newState) {
     applyEnvelopeParameters();
     
     // Calculate and set filter frequency
-    filterFrequency = daisysp::fmap(state.filter, 150.0f, 11710.0f, daisysp::Mapping::EXP);
+    filterFrequency = daisysp::fmap(state.filter, 150.0f, 7710.0f, daisysp::Mapping::EXP);
     
     // Update oscillator frequencies
     updateOscillatorFrequencies();
@@ -182,22 +188,23 @@ void Voice::setSequencer(Sequencer* seq) {
 
 void Voice::processEffectsChain(float& signal) {
     if (config.hasOverdrive) {
-        signal = overdrive.Process(signal);
+        signal = overdrive.Process(signal*config.overdriveAmount);
     }
     
     if (config.hasWavefolder) {
-        signal = wavefolder.Process(signal);
+        signal = wavefolder.Process(signal*2.f);
     }
 }
-
+// Updated to support chord functionality with config.harmony[]
 void Voice::updateOscillatorFrequencies() {
-    // Calculate base frequency from note and octave
-    float baseFreq = calculateNoteFrequency(state.note, state.octave);
-    
-    // Update each oscillator with detuning
+    // Update each oscillator with harmony intervals and detuning
     for (size_t i = 0; i < oscillators.size() && i < 3; i++) {
+        // Calculate frequency for this oscillator using harmony interval
+        float harmonyFreq = calculateNoteFrequency(state.note, state.octave, config.harmony[i]);
+        
+        // Apply detuning on top of harmony
         float detuneMultiplier = std::pow(2.0f, config.oscDetuning[i] / 12.0f);
-        float targetFreq = baseFreq * detuneMultiplier;
+        float targetFreq = harmonyFreq * detuneMultiplier;
         
         if (state.slide) {
             // Set target for slewing
@@ -214,25 +221,29 @@ void Voice::updateOscillatorFrequencies() {
 void Voice::applyEnvelopeParameters() {
     // Map normalized parameters to appropriate ranges
     float attack = daisysp::fmap(state.attack, 0.005f, 0.75f, daisysp::Mapping::LINEAR);
-    float decay = daisysp::fmap(state.decay, 0.01f, 0.6f, daisysp::Mapping::LINEAR);
+    float decay = daisysp::fmap(state.decay, 0.005f,0.6f, daisysp::Mapping::LINEAR);
     float release = decay; // Use decay for release in this implementation
     
     envelope.SetAttackTime(attack);
-    envelope.SetDecayTime(0.05f+(release * 0.5f));
+    envelope.SetDecayTime(0.05f+(release * 0.22f));
     envelope.SetReleaseTime(release);
 }
 
-float Voice::calculateNoteFrequency(float note, int8_t octaveOffset) {
+float Voice::calculateNoteFrequency(float note, int8_t octaveOffset, int harmony) {
     // Clamp note to valid range
     int noteIndex = std::max(0, std::min(static_cast<int>(note), 47)); // 48 notes max
+    
+    // Apply harmony interval, ensuring we stay within scale bounds
+    int harmonyNoteIndex = std::max(0, std::min(noteIndex + harmony, 47));
     
     // Get frequency from scale using the current scale index
     extern int scale[7][48];
     extern uint8_t currentScale;
-    int scaleNote = scale[currentScale][noteIndex];
     
-    // Use mtof() with proper MIDI note calculation (original approach)
-    // Add 48 to center the scale around middle C, then add octave offset
+    int scaleNote = scale[currentScale][harmonyNoteIndex];
+    
+    // Use mtof() with proper MIDI note calculation
+    // Add 36 to center the scale around middle C, then add octave offset
     float midiNote = scaleNote + 48 + octaveOffset;
     
     return daisysp::mtof(midiNote);
@@ -271,16 +282,19 @@ namespace VoicePresets {
         config.oscWaveforms[0] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
         config.oscWaveforms[1] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
         config.oscWaveforms[2] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
-        config.oscAmplitudes[0] = .53f;
+        config.oscAmplitudes[0] = .33f;
         config.oscAmplitudes[1] = .33f;
         config.oscAmplitudes[2] = .33f;
         config.oscDetuning[0] = 0.0f;
-        config.oscDetuning[1] = 0.02f; // Slight detune
-        config.oscDetuning[2] = -0.02f; // Slight detune opposite
+        config.oscDetuning[1] = 0.001f; // Slight detune
+        config.oscDetuning[2] = -0.001f; // Slight detune opposite
+        config.harmony[0] = 0; // Root note
+        config.harmony[1] = 0; // Unison (no harmony)
+        config.harmony[2] = 0; // Unison (no harmony)
         
-        config.filterRes = 0.59f;
+        config.filterRes = 0.43f;
         config.filterDrive = 2.1f;
-        config.filterMode = daisysp::LadderFilter::FilterMode::LP36;
+        config.filterMode = daisysp::LadderFilter::FilterMode::LP24;
         config.filterPassbandGain = 0.23f;
         config.highPassFreq = 140.0f;
         
@@ -292,32 +306,32 @@ namespace VoicePresets {
         
         config.defaultAttack = 0.04f;
         config.defaultDecay = 0.14f;
-        config.defaultSustain = 0.2f;
+        config.defaultSustain = 0.5f;
         config.defaultRelease = 0.1f;
-        
         return config;
     }
     
     VoiceConfig getDigitalVoice() {
         VoiceConfig config;
         config.oscillatorCount = 3;
-        config.oscWaveforms[0] = daisysp::Oscillator::WAVE_POLYBLEP_SQUARE;
-        config.oscWaveforms[1] = daisysp::Oscillator::WAVE_SIN;
+        config.oscWaveforms[0] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
+        config.oscWaveforms[1] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
         config.oscWaveforms[2] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
-        config.oscAmplitudes[0] = 0.343f;
-        config.oscAmplitudes[1] = 1.f;
-        config.oscAmplitudes[2] = .34f;
+        config.oscAmplitudes[0] = 0.4f;
+        config.oscAmplitudes[1] = 0.35f;
+        config.oscAmplitudes[2] = .36f;
         config.oscPulseWidth[0] = 0.69f;
-        config.oscPulseWidth[1] = 0.23f;
-          config.oscDetuning[0] = 0.0f;
-          config.oscDetuning[0] = 0.0f;
-        config.oscDetuning[1] = 12.0f;
-        config.filterRes = 0.42f;
+        config.oscDetuning[0] = 0.0f; // Fixed duplicate assignment
+        config.oscDetuning[2] = 0.0f;
+        config.harmony[0] = 0; // Root note
+        config.harmony[1] = 4; // PERFECT 5TH
+        config.harmony[2] = 7; //Octave
+        config.filterRes = 0.22f;
         config.filterDrive = 3.0f;
         config.filterPassbandGain = 0.24f;
         config.highPassFreq = 170.0f;
 
-        config.filterMode = daisysp::LadderFilter::FilterMode::BP24;
+        config.filterMode = daisysp::LadderFilter::FilterMode::LP24; // Low-pass filter
 
         config.hasOverdrive = false;
         config.hasWavefolder = false;
@@ -332,21 +346,23 @@ namespace VoicePresets {
     
     VoiceConfig getBassVoice() {
         VoiceConfig config;
-        config.oscillatorCount = 3;
+        config.oscillatorCount = 2;
         config.oscWaveforms[0] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
         config.oscWaveforms[1] = daisysp::Oscillator::WAVE_POLYBLEP_TRI;
-        config.oscWaveforms[2] = daisysp::Oscillator::WAVE_POLYBLEP_TRI;
-        config.oscAmplitudes[0] = .4f;
+        config.oscAmplitudes[0] = .25f;
         config.oscAmplitudes[1] = 1.f;
-        config.oscAmplitudes[2] = 1.f;
-        config.oscDetuning[1] = -12.0002f; // One octave down
-        config.oscDetuning[2] = -11.9994f; // One octave down
+        config.oscDetuning[0] = 0.0f;
+        config.oscDetuning[1] = -12.000f; // One octave down
+        config.oscDetuning[2] = 0.0f;
+        config.harmony[0] = 0; // Root note
+        config.harmony[1] = 0; // Unison (bass typically monophonic)
+        config.harmony[2] = 0; // Unison
         
-        config.filterRes = 0.3f;
-        config.filterDrive = 2.7f;
+        config.filterRes = 0.2f;
+        config.filterDrive = 2.9f;
         config.filterPassbandGain = 0.22f;
         config.highPassFreq = 66.0f; // Lower for bass
-        config.filterMode = daisysp::LadderFilter::FilterMode::LP36;
+        config.filterMode = daisysp::LadderFilter::FilterMode::LP24;
 config.hasWavefolder = false;
         config.hasOverdrive = false;
         config.overdriveAmount = 0.15f; // Subtle overdrive
@@ -371,6 +387,9 @@ config.hasWavefolder = false;
         config.oscDetuning[0] = 0.0f;
         config.oscDetuning[1] = 0.014f;  
         config.oscDetuning[2] = -0.014f;
+        config.harmony[0] = 0; // Root note
+        config.harmony[1] = 0; // Unison (lead typically monophonic)
+        config.harmony[2] = 0; // Unison
         
         config.filterRes = 0.59f;
         config.filterDrive = 3.8f;
@@ -396,18 +415,18 @@ config.hasWavefolder = false;
         config.oscWaveforms[0] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
         config.oscWaveforms[1] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
         config.oscWaveforms[2] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
-        config.oscAmplitudes[0] = 0.3f;
-        config.oscAmplitudes[1] = 0.3f;
-        config.oscAmplitudes[2] = 0.3f;
-        config.oscDetuning[0] = 0.0f;
-        config.oscDetuning[1] = 12.0f;  // One octave up
-        config.oscDetuning[2] = 7.0f;  // Perfect fifth above octave
+        config.oscAmplitudes[0] = 0.36f;
+        config.oscAmplitudes[1] = 0.36f;
+        config.oscAmplitudes[2] = 0.36f;
+        config.harmony[0] = 0; // Root note
+        config.harmony[1] = 4; // Major third
+        config.harmony[2] = 2; // Major sixth (creates rich pad harmony)
         
-        config.filterRes = 0.1f;
-        config.filterDrive = 3.f;
+        config.filterRes = 0.3f;
+        config.filterDrive = 1.1f;
         config.filterPassbandGain = 0.23f;
         config.highPassFreq = 160.0f;
-        config.filterMode = daisysp::LadderFilter::FilterMode::LP12; // Band-pass for percussive sound
+        config.filterMode = daisysp::LadderFilter::FilterMode::LP24; // Band-pass for percussive sound
 
         config.hasOverdrive = false;
         config.hasWavefolder = false;
@@ -416,34 +435,40 @@ config.hasWavefolder = false;
         config.defaultDecay = 0.8f;
         config.defaultSustain = 0.5f;
         config.defaultRelease = .5f; // Long release
-        
-       // config.outputLevel = 0.6f; // Lower level for pad
+        config.outputLevel = 0.6f; // Lower level for pad
+       // config.outputLevel = 0.6f; // conLower level for pad
         
         return config;
     }
         
     VoiceConfig getPercussionVoice() {
         VoiceConfig config;
-        config.oscillatorCount = 1;
+        config.oscillatorCount = 0; // No oscillators, only noise
         config.oscWaveforms[0] = VoiceConfig::WAVE_NOISE; // Use noise for percussive texture
-       // config.oscWaveforms[1] = daisysp::Oscillator::WAVE_POLYBLEP_TRI;
+        config.oscWaveforms[1] = VoiceConfig::WAVE_NOISE; // Use noise for percussive texture
         config.oscAmplitudes[0] = 1.0f; // Full amplitude for noise
-        config.oscAmplitudes[1] =1.f;
+        config.oscAmplitudes[1] = 0.0f;
+        config.oscAmplitudes[2] = 0.0f;
         config.oscDetuning[0] = 0.0f;
-        config.filterMode = daisysp::LadderFilter::FilterMode::BP24; // Band-pass for percussive sound
-        config.filterRes = 0.59f; // High resonance
+        config.oscDetuning[1] = 0.0f;
+        config.oscDetuning[2] = 0.0f;
+        config.harmony[0] = 0; // Root note
+        config.harmony[1] = 0; // Percussion typically monophonic
+        config.harmony[2] = 0; // Percussion typically monophonic
+        config.filterMode = daisysp::LadderFilter::FilterMode::LP36; // Band-pass for percussive sound
+        config.filterRes = 0.49f; // High resonance
         config.filterDrive = 3.0f;
         config.filterPassbandGain = 0.33f;
         config.highPassFreq = 222.0f; // High-pass for percussion
         
-        config.hasOverdrive = false;
-        config.hasWavefolder = false;
+        config.hasOverdrive = true;
+        config.hasWavefolder = true;
         config.overdriveAmount = 0.2f;
         config.wavefolderGain = 3.0f;
         
         config.defaultAttack = 0.001f; // Very fast attack
         config.defaultDecay = 0.05f;   // Short decay
-        config.defaultSustain = 0.1f;  // Low sustain
+        config.defaultSustain = 0.0f;  // Low sustain
         config.defaultRelease = 0.1f;  // Short release
         
         return config;

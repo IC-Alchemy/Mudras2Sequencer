@@ -29,7 +29,7 @@ struct VoiceConfig {
     float oscAmplitudes[3] = {1.0f, 1.0f, 1.0f};
     float oscDetuning[3] = {0.0f, 0.0f, 0.0f}; // In semitones
     float oscPulseWidth[3] = {0.5f, 0.5f, 0.5f}; // For square/pulse waves
-    
+    int harmony[3] = {0, 0, 0}; // Harmony intervals for each oscillator (scale steps)
     // Filter settings
     float filterRes = 0.4f;
     float filterDrive = 1.1f;
@@ -255,9 +255,10 @@ private:
      * @brief Calculate frequency for a given note with octave offset
      * @param note Note value (0-21 for scale array lookup)
      * @param octaveOffset Octave offset in semitones
+     * @param harmony Harmony value
      * @return float Frequency in Hz
      */
-    float calculateNoteFrequency(float note, int8_t octaveOffset);
+    float calculateNoteFrequency(float note, int8_t octaveOffset, int harmony);
     
     /**
      * @brief Process frequency slewing for slide functionality

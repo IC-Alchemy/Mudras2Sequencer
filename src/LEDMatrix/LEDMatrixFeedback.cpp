@@ -177,6 +177,109 @@ void setupLEDMatrixFeedback() {
     }
 }
 
+/**
+ * @brief Updates LED matrix to show settings mode interface
+ * 
+ * Displays menu options and preset selections using step LEDs:
+ * - Main menu: Shows Voice 1 and Voice 2 options (steps 0-1)
+ * - Preset selection: Shows available presets (steps 0-5 for 6 presets)
+ * - Uses different colors to indicate current selection and available options
+ */
+void updateSettingsModeLEDs(LEDMatrix& ledMatrix, const UIState& uiState) {
+    const LEDThemeColors* activeThemeColors = getActiveThemeColors();
+    
+    // Clear all LEDs first
+    for (int i = 0; i < LEDMatrix::WIDTH * LEDMatrix::HEIGHT; ++i) {
+        ledMatrix.getLeds()[i] = CRGB::Black;
+    }
+    
+    if (uiState.inPresetSelection) {
+        // Preset selection mode - show available presets
+        const uint8_t presetCount = 6; // VoicePresets::getPresetCount() returns 6
+        
+        // Define preset colors based on voice being configured
+        CRGB selectedColor = (uiState.settingsMenuIndex == 0) ? 
+            activeThemeColors->gateOnV1 : activeThemeColors->gateOnV2;
+        CRGB availableColor = (uiState.settingsMenuIndex == 0) ? 
+            activeThemeColors->gateOffV1 : activeThemeColors->gateOffV2;
+        
+        // Show presets in first 6 step positions (0-5)
+        for (uint8_t i = 0; i < presetCount && i < 16; i++) {
+            CRGB color;
+            
+            // Highlight currently selected preset
+            uint8_t currentPresetIndex = (uiState.settingsMenuIndex == 0) ? 
+                uiState.voice1PresetIndex : uiState.voice2PresetIndex;
+            
+            if (i == currentPresetIndex) {
+                // Current preset - bright pulsing
+                uint32_t time = millis();
+                float pulse = 0.5f + 0.5f * sinf(time * 0.008f);
+                color = selectedColor;
+                color.nscale8(static_cast<uint8_t>(128 + 127 * pulse));
+            } else {
+                // Available preset - dim steady
+                color = availableColor;
+                color.nscale8(64);
+            }
+            
+            // Calculate LED position
+            int x = i % LEDMatrix::WIDTH;
+            int y = i / LEDMatrix::WIDTH;
+            ledMatrix.setLED(x, y, color);
+        }
+        
+        // Show which voice is being configured in bottom row
+        if (uiState.settingsMenuIndex == 0) {
+            // Voice 1 indicator
+            ledMatrix.setLED(0, 7, activeThemeColors->gateOnV1);
+        } else {
+            // Voice 2 indicator  
+            ledMatrix.setLED(1, 7, activeThemeColors->gateOnV2);
+        }
+        
+    } else {
+        // Main settings menu - show Voice 1 and Voice 2 options
+        
+        // Voice 1 option (step 0)
+        CRGB voice1Color = (uiState.settingsMenuIndex == 0) ? 
+            activeThemeColors->gateOnV1 : activeThemeColors->gateOffV1;
+        if (uiState.settingsMenuIndex == 0) {
+            // Add pulsing effect for selected option
+            uint32_t time = millis();
+            float pulse = 0.5f + 0.5f * sinf(time * 0.006f);
+            voice1Color.nscale8(static_cast<uint8_t>(128 + 127 * pulse));
+        } else {
+            voice1Color.nscale8(96);
+        }
+        ledMatrix.setLED(0, 0, voice1Color);
+        
+        // Voice 2 option (step 1)
+        CRGB voice2Color = (uiState.settingsMenuIndex == 1) ? 
+            activeThemeColors->gateOnV2 : activeThemeColors->gateOffV2;
+        if (uiState.settingsMenuIndex == 1) {
+            // Add pulsing effect for selected option
+            uint32_t time = millis();
+            float pulse = 0.5f + 0.5f * sinf(time * 0.006f);
+            voice2Color.nscale8(static_cast<uint8_t>(128 + 127 * pulse));
+        } else {
+            voice2Color.nscale8(96);
+        }
+        ledMatrix.setLED(1, 0, voice2Color);
+        
+        // Show current preset indicators in bottom row
+        // Voice 1 current preset
+        CRGB v1PresetColor = activeThemeColors->gateOnV1;
+        v1PresetColor.nscale8(64);
+        ledMatrix.setLED(uiState.voice1PresetIndex % LEDMatrix::WIDTH, 6, v1PresetColor);
+        
+        // Voice 2 current preset
+        CRGB v2PresetColor = activeThemeColors->gateOnV2;
+        v2PresetColor.nscale8(64);
+        ledMatrix.setLED(uiState.voice2PresetIndex % LEDMatrix::WIDTH, 7, v2PresetColor);
+    }
+}
+
 
 /**
  * @brief Updates the LED matrix to reflect the current gate states of both sequencers.
@@ -275,6 +378,12 @@ void updateStepLEDs(
     const UIState& uiState,
     int mm
 ) {
+    // Handle settings mode LED feedback
+    if (uiState.settingsMode) {
+        updateSettingsModeLEDs(ledMatrix, uiState);
+        return;
+    }
+
     const ParamButtonMapping* heldMapping = getHeldParameterButton(uiState);
     bool anyParamForLengthHeld = (heldMapping != nullptr);
     ParamId activeParamIdForLength = anyParamForLengthHeld ? heldMapping->paramId : ParamId::Count;

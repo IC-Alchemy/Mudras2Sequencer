@@ -18,6 +18,16 @@ void updateStepLEDs(
     int mm
 );
 
+/**
+ * @brief Updates LED matrix to show settings mode interface
+ * 
+ * Displays menu options and preset selections using step LEDs:
+ * - Main menu: Shows Voice 1 and Voice 2 options (steps 0-1)
+ * - Preset selection: Shows available presets (steps 0-5 for 6 presets)
+ * - Uses different colors to indicate current selection and available options
+ */
+void updateSettingsModeLEDs(LEDMatrix& ledMatrix, const UIState& uiState);
+
 
 void setStepLedColor(uint8_t step, uint8_t r, uint8_t g, uint8_t b);
 

@@ -770,7 +770,7 @@ void loop1()
 
 
     static unsigned long lastLEDUpdate = 0;
-    const unsigned long LED_UPDATE_INTERVAL = 2; // 20ms interval
+    const unsigned long LED_UPDATE_INTERVAL = 10; // 20ms interval
 
     uint16_t currtouched = touchSensor.touched();
     
