@@ -73,17 +73,7 @@ void matrixEventHandler(const MatrixButtonEvent &evt, UIState &uiState,
   // Handle Voice Switch (Button 24) with long press for LFO mode
   if (evt.buttonIndex == BUTTON_VOICE_SWITCH) {
     if (evt.type == MATRIX_BUTTON_PRESSED) {
-      uiState.button24PressTime = millis();
-      uiState.button24WasPressed = true;
-    } else if (evt.type == MATRIX_BUTTON_RELEASED &&
-               uiState.button24WasPressed) {
-      unsigned long pressDuration = millis() - uiState.button24PressTime;
-      uiState.button24WasPressed = false;
-
-      if (isLongPress(pressDuration)) {
-        // Long press functionality removed - LFOs no longer supported
-        Serial.println("Long press functionality removed - LFOs no longer supported");
-      } else {
+    
         midiNoteManager.onModeSwitch();
         uiState.isVoice2Mode = !uiState.isVoice2Mode;
         uiState.selectedStepForEdit = -1;
