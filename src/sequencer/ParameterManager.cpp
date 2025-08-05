@@ -78,22 +78,7 @@ void ParameterManager::setValue(ParamId id, uint8_t stepIdx, float value)
         clampedValue = roundf(clampedValue);
     }
 
-    // DEBUG: Trace parameter setting (only for Note parameter to reduce spam)
-    /*
-    if (id == ParamId::Note) {
-        Serial.print("[PARAM SET DEBUG] Note step ");
-        Serial.print(stepIdx);
-        Serial.print(": ");
-        Serial.print(value, 2);
-        Serial.print(" -> ");
-        Serial.print(clampedValue, 2);
-        Serial.print(" (range: ");
-        Serial.print(minVal, 2);
-        Serial.print("-");
-        Serial.print(maxVal, 2);
-        Serial.println(")");
-    }
-    */
+
 
     _tracks[static_cast<size_t>(id)].setValue(stepIdx, clampedValue);
 }

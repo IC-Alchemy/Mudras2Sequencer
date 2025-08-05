@@ -51,6 +51,8 @@ float getParameterMinValue(AS5600ParameterMode param)
         return 120.0f; // 10ms minimum delay (480 samples at 48kHz)
     case AS5600ParameterMode::DelayFeedback:
         return 0.0f;
+    case AS5600ParameterMode::SlideTime:
+        return 0.0f; // Minimum slide time (instant)
 
     default:
         return 0.0f;
@@ -73,6 +75,8 @@ float getParameterMaxValue(AS5600ParameterMode param)
         return MAX_DELAY_SAMPLES * .85f; // Maximum delay in samples (1.8 seconds)
     case AS5600ParameterMode::DelayFeedback:
         return 0.91f; // Maximum 95% feedback to prevent excessive feedback
+    case AS5600ParameterMode::SlideTime:
+        return 1.0f; // Maximum slide time
 
     default:
         return 1.0f;
@@ -89,6 +93,12 @@ float getAS5600BaseValueRange(AS5600ParameterMode param)
    
     {
         return fullRange; // Full range for delay parameters
+    }
+
+    // SlideTime uses full range without restrictions
+    if (param == AS5600ParameterMode::SlideTime)
+    {
+        return fullRange; // Full range for slide time parameter
     }
 
     // Other parameters use reduced range to leave room for sequencer values
@@ -221,6 +231,9 @@ void applyIncrementToParameter(AS5600BaseValues *baseValues, AS5600ParameterMode
     case AS5600ParameterMode::DelayFeedback:
         targetValue = &baseValues->delayFeedback;
         break;
+    case AS5600ParameterMode::SlideTime:
+        targetValue = &baseValues->slideTime;
+        break;
 
     default:
         return; // Invalid parameter
@@ -241,7 +254,7 @@ void applyIncrementToParameter(AS5600BaseValues *baseValues, AS5600ParameterMode
         float maxRange = getAS5600BaseValueRange(param);
         *targetValue = std::max(-maxRange, std::min(newValue, maxRange));
     }
-    // For unidirectional parameters (delay)
+    // For unidirectional parameters (delay and slide time)
     else
     {
         float minVal = getParameterMinValue(param);
@@ -283,6 +296,8 @@ ParamId convertAS5600ParameterToParamId(AS5600ParameterMode as5600Param)
         return ParamId::Decay;
     case AS5600ParameterMode::Note:
         return ParamId::Note;
+    case AS5600ParameterMode::SlideTime:
+        return ParamId::Count; // SlideTime is not a step parameter
     default:
         return ParamId::Count; // Invalid for step editing
     }
@@ -420,6 +435,38 @@ void applyAS5600DelayValues()
     */
 }
 
+/**
+ * Apply AS5600 magnetic encoder values to voice slide time parameters.
+ * Only active when UIState is in slideMode and AS5600 parameter is SlideTime.
+ * Controls slide time for smooth pitch transitions between notes.
+ */
+void applyAS5600SlideTimeValues()
+{
+    if (!as5600Sensor.isConnected() || !uiState.slideMode || uiState.currentAS5600Parameter != AS5600ParameterMode::SlideTime)
+    {
+        return;
+    }
+
+    // Get current AS5600 position (0.0 to 1.0)
+    float normalizedPosition = as5600Sensor.getNormalizedPosition();
+
+    // Get active base values for current voice
+    extern AS5600BaseValues as5600BaseValuesVoice1, as5600BaseValuesVoice2;
+    AS5600BaseValues *activeBaseValues = uiState.isVoice2Mode ? &as5600BaseValuesVoice2 : &as5600BaseValuesVoice1;
+
+    // Calculate slide time (0.0 to 1.0 seconds) with base value offset
+    float slideTimeValue = normalizedPosition * getParameterMaxValue(AS5600ParameterMode::SlideTime) + activeBaseValues->slideTime;
+    slideTimeValue = std::max(0.0f, std::min(slideTimeValue, getParameterMaxValue(AS5600ParameterMode::SlideTime)));
+
+    // Apply slide time to the appropriate voice using VoiceManager
+    extern VoiceManager* voiceManager;
+    if (voiceManager != nullptr)
+    {
+        uint8_t voiceId = uiState.isVoice2Mode ? 1 : 0;
+        voiceManager->setVoiceSlide(voiceId, slideTimeValue);
+    }
+}
+
 
 
 // =======================
@@ -460,6 +507,9 @@ float getAS5600ParameterValue()
         break;
     case AS5600ParameterMode::DelayFeedback:
         value = activeBaseValues->delayFeedback;
+        break;
+    case AS5600ParameterMode::SlideTime:
+        value = activeBaseValues->slideTime;
         break;
    
     }

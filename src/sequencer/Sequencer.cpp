@@ -402,16 +402,7 @@ void Sequencer::processStep(uint8_t stepIdx, VoiceState *voiceState)
         voiceState->slide = slideVal;
         voiceState->gateLength = noteDurationTicks;
 
-        // DEBUG: Trace VoiceState update
-        /*
-        Serial.print("[VOICESTATE DEBUG] Updated - note: ");
-        Serial.print(voiceState->note, 2);
-        Serial.print(", octave: ");
-        Serial.print(voiceState->octave, 2);
-        Serial.print(", gate: ");
-        Serial.print(voiceState->gate ? "ON" : "OFF");
-        Serial.println();
-        */
+  
     }
 
     // Update slide state tracking for next step

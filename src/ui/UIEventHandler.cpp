@@ -43,33 +43,29 @@ void matrixEventHandler(const MatrixButtonEvent &evt, UIState &uiState,
                         MidiNoteManager &midiNoteManager) {
   // Check and trigger any pending long-press resets immediately
   pollUIHeldButtons(uiState, seq1, seq2);
+// This code handles the slide mode toggle button (Button 22)
+// Slide mode allows users to toggle slide/legato between notes in the sequence
+// When enabled, it disables other conflicting modes and allows setting slide per step
 
 
-  // Handle Slide Mode toggle (Button 22)
-  if (evt.buttonIndex == BUTTON_SLIDE_MODE) {
+if (evt.buttonIndex == BUTTON_SLIDE_MODE) {
     if (evt.type == MATRIX_BUTTON_PRESSED) {
-      unsigned long now = millis();
-      const unsigned long SLIDE_MODE_DEBOUNCE_MS = 150;
-      if (now - uiState.lastSlideModeToggleTime >= SLIDE_MODE_DEBOUNCE_MS) {
-        uiState.lastSlideModeToggleTime = now;
         // Toggle slide mode on press
         uiState.slideMode = !uiState.slideMode;
         if (uiState.slideMode) {
-          // Clear conflicting modes when entering slide mode
-          for (int i = 0; i < PARAM_ID_COUNT; ++i) {
-            uiState.parameterButtonHeld[i] = false;
-          }
-          uiState.modGateParamSeqLengthsMode = false;
-          uiState.selectedStepForEdit = -1;
-          Serial.println("Entered Slide Mode");
+            // Clear conflicting modes when entering slide mode
+            for (int i = 0; i < PARAM_ID_COUNT; ++i) {
+                uiState.parameterButtonHeld[i] = false;
+            }
+            uiState.modGateParamSeqLengthsMode = false;
+            uiState.selectedStepForEdit = -1;
+            Serial.println("Entered Slide Mode");
         } else {
-          Serial.println("Exited Slide Mode");
+            Serial.println("Exited Slide Mode");
         }
-      }
     }
     return; // Exit after handling
-  }
-
+}
   // Handle Voice Switch (Button 24) with long press for LFO mode
   if (evt.buttonIndex == BUTTON_VOICE_SWITCH) {
     if (evt.type == MATRIX_BUTTON_PRESSED) {
@@ -485,6 +481,9 @@ static void handleAS5600ParameterControl(UIState &uiState) {
     break;
   case AS5600ParameterMode::DelayFeedback:
     Serial.println("Delay Feedback");
+    break;
+  case AS5600ParameterMode::SlideTime:
+    Serial.println("Slide Time");
     break;
 
   case AS5600ParameterMode::COUNT:

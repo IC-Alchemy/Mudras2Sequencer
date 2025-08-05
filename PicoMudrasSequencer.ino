@@ -718,6 +718,9 @@ void loop1()
     // Update AS5600 sensor and base values
     as5600Sensor.update();
     updateAS5600BaseValues(uiState);
+    
+    // Apply AS5600 slide time control when in slide mode
+    applyAS5600SlideTimeValues();
 
     // Process all pending PPQN ticks
     static uint16_t globalTickCounter = 0; // Global tick counter for MidiNoteManager

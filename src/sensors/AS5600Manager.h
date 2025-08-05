@@ -37,6 +37,7 @@ void updateAS5600BaseValues(UIState& uiState);
 void updateAS5600StepParameterValues(UIState& uiState);
 void applyAS5600BaseValues(VoiceState *voiceState, uint8_t voiceId);
 void applyAS5600DelayValues();
+void applyAS5600SlideTimeValues();
 float getParameterMinValue(AS5600ParameterMode param);
 float getParameterMaxValue(AS5600ParameterMode param);
 float getAS5600BaseValueRange(AS5600ParameterMode param);

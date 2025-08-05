@@ -35,7 +35,8 @@ enum class AS5600ParameterMode : uint8_t {
     Note = 4,
     DelayTime = 5,
     DelayFeedback = 6,
-    COUNT = 7
+    SlideTime = 7,
+    COUNT = 8
 };
 
 // AS5600 parameter base values (per voice) - supports bidirectional control
@@ -46,6 +47,7 @@ struct AS5600BaseValues {
     float decay = 0.0f;
     float delayTime = 0.0f;       // Delay time offset for global delay
     float delayFeedback = 0.0f;   // Delay feedback offset for global delay
+    float slideTime = 0.0f;       // Slide time in seconds for voice glide
 };
 
 // Voice-specific AS5600 base values (same structure as base, no shadowing)
