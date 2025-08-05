@@ -715,12 +715,7 @@ void loop1()
     // Check if any parameter buttons are held for prioritized sensor updates
     bool parameterRecordingActive = isAnyParameterButtonHeld(uiState);
 
-    // Update AS5600 sensor and base values
-    as5600Sensor.update();
-    updateAS5600BaseValues(uiState);
-    
-    // Apply AS5600 slide time control when in slide mode
-    applyAS5600SlideTimeValues();
+
 
     // Process all pending PPQN ticks
     static uint16_t globalTickCounter = 0; // Global tick counter for MidiNoteManager
@@ -773,15 +768,21 @@ void loop1()
 
 
     static unsigned long lastLEDUpdate = 0;
-    const unsigned long LED_UPDATE_INTERVAL = 10; // 20ms interval
-
+    static unsigned long lastControlUpdate = 0;
+    
+    const unsigned long LED_UPDATE_INTERVAL = 30; // 30ms interval
+    const unsigned long CONTROL_UPDATE_INTERVAL = 4; // 2ms interval
     uint16_t currtouched = touchSensor.touched();
     
+if ((currentMillis - lastControlUpdate >= CONTROL_UPDATE_INTERVAL)){  
+    lastControlUpdate = currentMillis;
     Matrix_scan();
 
-    // Update LEDs only every 20ms
-    if (currentMillis - lastLEDUpdate >= LED_UPDATE_INTERVAL) {
-        lastLEDUpdate = currentMillis;
+        // Update AS5600 sensor and base values
+    as5600Sensor.update();
+    updateAS5600BaseValues(uiState);
+    
+    // Apply AS5600 slide time control when in slide mode
         
     // Update sensor once per loop iteration (avoid multiple calls)
     distanceSensor.update();
@@ -796,6 +797,11 @@ void loop1()
         mm = 0; // Invalid reading
     }
 
+
+}
+    // Update LEDs only every 20ms
+    if (currentMillis - lastLEDUpdate >= LED_UPDATE_INTERVAL) {
+     lastLEDUpdate = currentMillis;
         updateStepLEDs(ledMatrix, seq1, seq2, uiState, mm);
         display.update(uiState, seq1, seq2);
 

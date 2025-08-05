@@ -266,18 +266,60 @@ void updateSettingsModeLEDs(LEDMatrix& ledMatrix, const UIState& uiState) {
             voice2Color.nscale8(96);
         }
         ledMatrix.setLED(1, 0, voice2Color);
-        
-        // Show current preset indicators in bottom row
-        // Voice 1 current preset
-        CRGB v1PresetColor = activeThemeColors->gateOnV1;
-        v1PresetColor.nscale8(64);
-        ledMatrix.setLED(uiState.voice1PresetIndex % LEDMatrix::WIDTH, 6, v1PresetColor);
-        
-        // Voice 2 current preset
-        CRGB v2PresetColor = activeThemeColors->gateOnV2;
-        v2PresetColor.nscale8(64);
-        ledMatrix.setLED(uiState.voice2PresetIndex % LEDMatrix::WIDTH, 7, v2PresetColor);
     }
+}
+
+void updateVoiceParameterLEDs(LEDMatrix& ledMatrix, const UIState& uiState) {
+    if (!uiState.inVoiceParameterMode) return;
+    
+    // Get active theme colors
+    const LEDThemeColors* activeThemeColors = getActiveThemeColors();
+    if (!activeThemeColors) return;
+    
+    // Clear all LEDs first
+    for (int i = 0; i < LEDMatrix::WIDTH * LEDMatrix::HEIGHT; i++) {
+        ledMatrix.setLED(i % LEDMatrix::WIDTH, i / LEDMatrix::WIDTH, CRGB::Black);
+    }
+    
+    // Map button index to LED position (buttons 9-24 map to steps 8-23)
+    uint8_t ledIndex = uiState.lastVoiceParameterButton - 1;
+    if (ledIndex >= LEDMatrix::WIDTH * LEDMatrix::HEIGHT) return;
+    
+    // Choose color based on voice and parameter type
+    CRGB paramColor;
+    
+    switch (uiState.lastVoiceParameterButton) {
+        case 9:  // Envelope
+            paramColor = uiState.isVoice2Mode ? activeThemeColors->modAttackActive : activeThemeColors->modDecayActive;
+            break;
+        case 10: // Overdrive
+            paramColor = uiState.isVoice2Mode ? activeThemeColors->modFilterActive : activeThemeColors->modVelocityActive;
+            break;
+        case 11: // Wavefolder
+            paramColor = uiState.isVoice2Mode ? activeThemeColors->modOctaveActive : activeThemeColors->modNoteActive;
+            break;
+        case 12: // Filter Mode
+            paramColor = uiState.isVoice2Mode ? activeThemeColors->gateOnV2 : activeThemeColors->gateOnV1;
+            break;
+        case 13: // Filter Resonance
+            paramColor = uiState.isVoice2Mode ? activeThemeColors->modSlideActive : activeThemeColors->modParamModeActive;
+            break;
+        default:
+            paramColor = uiState.isVoice2Mode ? activeThemeColors->defaultActive : activeThemeColors->defaultInactive;
+            break;
+    }
+    
+    // Create pulsing effect for 3 seconds
+    if (millis() - uiState.voiceParameterChangeTime < 3000) {
+        uint32_t time = millis();
+        float pulse = 0.5f + 0.5f * sinf(time * 0.01f); // Faster pulse for voice parameters
+        paramColor.nscale8(static_cast<uint8_t>(128 + 127 * pulse));
+    } else {
+        paramColor.nscale8(64); // Dim after timeout
+    }
+    
+    // Set the LED for the voice parameter button
+    ledMatrix.setLED(ledIndex % LEDMatrix::WIDTH, ledIndex / LEDMatrix::WIDTH, paramColor);
 }
 
 
@@ -381,6 +423,12 @@ void updateStepLEDs(
     // Handle settings mode LED feedback
     if (uiState.settingsMode) {
         updateSettingsModeLEDs(ledMatrix, uiState);
+        return;
+    }
+    
+    // Handle voice parameter mode LED feedback
+    if (uiState.inVoiceParameterMode && (millis() - uiState.voiceParameterChangeTime < 3000)) {
+        updateVoiceParameterLEDs(ledMatrix, uiState);
         return;
     }
 

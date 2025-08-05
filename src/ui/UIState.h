@@ -61,10 +61,15 @@ struct UIState {
    bool inPresetSelection = false;
    uint8_t voice1PresetIndex = 3;      // Default to Lead Voice
    uint8_t voice2PresetIndex = 2;      // Default to Bass Voice 
-uint8_t voice3PresetIndex = 1;      // Default to Lead Voice
+   uint8_t voice3PresetIndex = 1;      // Default to Lead Voice
    uint8_t voice4PresetIndex = 5;      //Default to Percussion Voice
    unsigned long playStopPressTime = 0;
    bool playStopWasPressed = false;
+   
+   // --- Voice Parameter Editing State ---
+   bool inVoiceParameterMode = false;
+   uint8_t lastVoiceParameterButton = 0;  // Track which voice parameter was last changed
+   unsigned long voiceParameterChangeTime = 0;  // Timestamp of last voice parameter change
 };
 
 #endif // UI_STATE_H

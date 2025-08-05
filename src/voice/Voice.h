@@ -26,21 +26,25 @@ struct VoiceConfig {
         daisysp::Oscillator::WAVE_POLYBLEP_SAW,
         daisysp::Oscillator::WAVE_POLYBLEP_SAW
     };
-    float oscAmplitudes[3] = {1.0f, 1.0f, 1.0f};
+    float oscAmplitudes[3] = {.5f, .5f, .5f};
     float oscDetuning[3] = {0.0f, 0.0f, 0.0f}; // In semitones
     float oscPulseWidth[3] = {0.5f, 0.5f, 0.5f}; // For square/pulse waves
     int harmony[3] = {0, 0, 0}; // Harmony intervals for each oscillator (scale steps)
     // Filter settings
-    float filterRes = 0.4f;
-    float filterDrive = 1.1f;
+    float filterRes = 0.2f;
+    float filterDrive = 1.8f;
     float filterPassbandGain = 0.23f;
     daisysp::LadderFilter::FilterMode filterMode =daisysp::LadderFilter::FilterMode::LP24;
     // High-pass filter settings
     float highPassFreq = 80.0f;
-    
+    float highPassRes = 0.1f;
+
     // Effects chain configuration
     bool hasOverdrive = false;
     bool hasWavefolder = false;
+    bool hasEnvelope = true; // Enable envelope by default
+    bool hasDalek = false;
+
     float overdriveAmount = 0.25f;
     float wavefolderGain = 1.5f;
     float wavefolderOffset = 1.0f;
@@ -52,7 +56,7 @@ struct VoiceConfig {
     float defaultRelease = 0.1f;
     
     // Voice mixing
-    float outputLevel = 1.0f;
+    float outputLevel = .6f;
     bool enabled = true;
 };
 
@@ -240,7 +244,7 @@ private:
      * @param signal Reference to signal to process (modified in place)
      */
     void processEffectsChain(float& signal);
-    
+
     /**
      * @brief Update oscillator frequencies based on current state
      */

@@ -4,6 +4,7 @@
 #include "../sequencer/Sequencer.h"
 #include "../sequencer/ShuffleTemplates.h"
 #include "../voice/Voice.h"
+#include "../voice/VoiceManager.h"
 #include "ButtonManager.h"
 #include <uClock.h>
 
@@ -17,6 +18,11 @@ extern void applyVoicePreset(uint8_t voiceNumber, uint8_t presetIndex);
 extern uint8_t currentScale;
 extern bool isClockRunning;
 extern const ParameterDefinition CORE_PARAMETERS[];
+
+// Voice system external declarations
+extern std::unique_ptr<VoiceManager> voiceManager;
+extern uint8_t leadVoiceId;
+extern uint8_t bassVoiceId;
 
 // Helper function declarations (static to this file)
 static bool handleParameterButtonEvent(const MatrixButtonEvent &evt,
@@ -262,37 +268,125 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
     return false;
   }
 
-  // Handle settings mode navigation
+  /////////////////  SETTINGS MODE/////////////
+  // Handle settings mode navigation when a button is pressed
   if (uiState.settingsMode && evt.type == MATRIX_BUTTON_PRESSED) {
     if (uiState.inPresetSelection) {
-      // In preset selection mode
+      // When in preset selection mode, handle selecting and applying voice presets
       if (evt.buttonIndex < VoicePresets::getPresetCount()) {
-        // Select and apply preset
+        // Select and apply preset based on which voice is being configured
         if (uiState.settingsMenuIndex == 0) {
+          // Voice 1 preset selection
           uiState.voice1PresetIndex = evt.buttonIndex;
           applyVoicePreset(1, evt.buttonIndex);
           Serial.print("Voice 1 preset set to: ");
           Serial.println(VoicePresets::getPresetName(evt.buttonIndex));
         } else if (uiState.settingsMenuIndex == 1) {
+          // Voice 2 preset selection  
           uiState.voice2PresetIndex = evt.buttonIndex;
           applyVoicePreset(2, evt.buttonIndex);
           Serial.print("Voice 2 preset set to: ");
           Serial.println(VoicePresets::getPresetName(evt.buttonIndex));
         }
+        // Exit preset selection mode after applying preset
         uiState.inPresetSelection = false;
       }
     } else {
-      // Main settings menu navigation
-      if (evt.buttonIndex < 2) { // Only Voice 1 and Voice 2 options
+      // Handle voice parameter toggles (buttons 9-24)
+      if (evt.buttonIndex >= 9 && evt.buttonIndex <= 24 && voiceManager) {
+        uint8_t currentVoiceId = uiState.isVoice2Mode ? bassVoiceId : leadVoiceId;
+        VoiceConfig* config = voiceManager->getVoiceConfig(currentVoiceId);
+        
+        if (config) {
+          // Set voice parameter editing state
+          uiState.inVoiceParameterMode = true;
+          uiState.lastVoiceParameterButton = evt.buttonIndex;
+          uiState.voiceParameterChangeTime = millis();
+          
+          switch (evt.buttonIndex) {
+            case 9: // Toggle hasEnvelope
+              config->hasEnvelope = !config->hasEnvelope;
+              Serial.print("Voice ");
+              Serial.print(uiState.isVoice2Mode ? "2" : "1");
+              Serial.print(" envelope ");
+              Serial.println(config->hasEnvelope ? "ON" : "OFF");
+              break;
+              
+            case 10: // Toggle hasOverdrive
+              config->hasOverdrive = !config->hasOverdrive;
+              Serial.print("Voice ");
+              Serial.print(uiState.isVoice2Mode ? "2" : "1");
+              Serial.print(" overdrive ");
+              Serial.println(config->hasOverdrive ? "ON" : "OFF");
+              break;
+              
+            case 11: // Toggle hasWavefolder
+              config->hasWavefolder = !config->hasWavefolder;
+              Serial.print("Voice ");
+              Serial.print(uiState.isVoice2Mode ? "2" : "1");
+              Serial.print(" wavefolder ");
+              Serial.println(config->hasWavefolder ? "ON" : "OFF");
+              break;
+              
+            case 12: // Cycle through filterMode
+              {
+                int currentMode = static_cast<int>(config->filterMode);
+                currentMode = (currentMode + 1) % 5; // Cycle through 5 filter modes
+                config->filterMode = static_cast<daisysp::LadderFilter::FilterMode>(currentMode);
+                
+                const char* filterNames[] = {"LP12", "LP24", "LP36", "BP12", "BP24"};
+                Serial.print("Voice ");
+                Serial.print(uiState.isVoice2Mode ? "2" : "1");
+                Serial.print(" filter mode: ");
+                Serial.println(filterNames[currentMode]);
+              }
+              break;
+            case 13: // Cycle through filter resonance amounts
+              {
+                float currentResonance = config->filterRes;
+                currentResonance += 0.1f;
+                if (currentResonance > 1.0f) currentResonance = 0.0f;
+                config->filterRes = currentResonance;
+                
+                Serial.print("Voice ");
+                Serial.print(uiState.isVoice2Mode ? "2" : "1");
+                Serial.print(" filter resonance: ");
+                Serial.println(currentResonance, 2);
+              }
+              break;
+              case 14:
+               config->hasDalek = !config->hasDalek;
+               Serial.print("Voice ");
+               Serial.print(uiState.isVoice2Mode ? "2" : "1");
+               Serial.print(" dalek ");
+               Serial.println(config->hasDalek ? "ON" : "OFF");
+               break;
+
+
+              
+            default:
+              // Buttons 13-24 reserved for future voice parameters
+              Serial.print("Voice parameter button ");
+              Serial.print(evt.buttonIndex);
+              Serial.println(" - not yet implemented");
+              break;
+          }
+          
+          // Apply the updated configuration to the voice
+          voiceManager->setVoiceConfig(currentVoiceId, *config);
+        }
+      }
+      // When in main settings menu, handle voice selection
+      else if (evt.buttonIndex < 2) { // Only Voice 1 and Voice 2 options available
+        // Store selected voice and enter preset selection mode
         uiState.settingsMenuIndex = evt.buttonIndex;
         uiState.inPresetSelection = true;
         Serial.print("Entered preset selection for Voice ");
         Serial.println(evt.buttonIndex + 1);
       }
     }
-    return true;
+    return true; // Event was handled
   }
-
   // Select current active sequencer based on voice mode
   Sequencer &currentActiveSeq = uiState.isVoice2Mode ? seq2 : seq1;
 

@@ -79,6 +79,16 @@ private:
      * @param uiState Current UI state containing settings information
      */
     void displaySettingsMenu(const UIState& uiState);
+    
+    /**
+     * @brief Display voice parameter information
+     * @param uiState Current UI state containing voice parameter information
+     * @param voiceManager Pointer to voice manager for accessing voice configs
+     * @param leadVoiceId ID of the lead voice
+     * @param bassVoiceId ID of the bass voice
+     */
+    void displayVoiceParameterInfo(const UIState& uiState, class VoiceManager* voiceManager, 
+                                  uint8_t leadVoiceId, uint8_t bassVoiceId);
 
 };
 

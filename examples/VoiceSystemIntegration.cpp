@@ -97,14 +97,6 @@ public:
         // This replaces the current MIDI CC update logic
     }
     
-    // Memory monitoring for embedded system
-    void printMemoryUsage() {
-        size_t usage = voiceManager->getMemoryUsage();
-        Serial.print("Voice system memory usage: ");
-        Serial.print(usage);
-        Serial.println(" bytes");
-    }
-};
 
 // Example: Dynamic voice creation during runtime
 void demonstrateDynamicVoiceCreation() {

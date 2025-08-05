@@ -262,6 +262,8 @@ void applyIncrementToParameter(AS5600BaseValues *baseValues, AS5600ParameterMode
         *targetValue = std::max(minVal, std::min(newValue, maxVal));
     }
 
+
+
     // Debug output for delay parameter changes (uncomment for debugging)
     /*
     if (param == AS5600ParameterMode::DelayTime || param == AS5600ParameterMode::DelayFeedback)
@@ -348,7 +350,7 @@ String formatParameterValueForDisplay(ParamId paramId, float value)
         return String((int)(value * 100)) + "%";
     case ParamId::Filter:
     {
-        int filterFreq = daisysp::fmap(value, 100.0f, 6710.0f, daisysp::Mapping::EXP);
+        int filterFreq = daisysp::fmap(value, 100.0f, 9710.0f, daisysp::Mapping::EXP);
         return String(filterFreq) + "Hz";
     }
     case ParamId::Attack:
@@ -425,46 +427,21 @@ void applyAS5600DelayValues()
 
     // Apply delay feedback directly (already clamped to 0.0-1.0 range in updateAS5600BaseValues)
     feedbackAmmount = baseValues->delayFeedback;
-
-    // Debug output for delay parameter updates (uncomment for debugging)
-    /*
-    Serial.print("Delay Update - DelayTime: ");
-    Serial.print(baseValues->delayTime, 1);
-    Serial.print(" samples, DelayFeedback: ");
-    Serial.println(baseValues->delayFeedback, 3);
-    */
 }
-
-/**
- * Apply AS5600 magnetic encoder values to voice slide time parameters.
- * Only active when UIState is in slideMode and AS5600 parameter is SlideTime.
- * Controls slide time for smooth pitch transitions between notes.
- */
-void applyAS5600SlideTimeValues()
+ // ----------------------
+// Helper: Update slide time on the active voice
+// ----------------------
+ void updateAS5600SlideTime(uint8_t voiceId, float slideTime)
 {
-    if (!as5600Sensor.isConnected() || !uiState.slideMode || uiState.currentAS5600Parameter != AS5600ParameterMode::SlideTime)
+      if (!as5600Sensor.isConnected()|| !uiState.slideMode)
     {
         return;
     }
+        const AS5600BaseValues *activeBaseValues = uiState.isVoice2Mode ? &as5600BaseValuesVoice2 : &as5600BaseValuesVoice1;
+//  finish up by updating the base values
+    applyIncrementToParameter((AS5600BaseValues *)activeBaseValues, AS5600ParameterMode::SlideTime, slideTime);
 
-    // Get current AS5600 position (0.0 to 1.0)
-    float normalizedPosition = as5600Sensor.getNormalizedPosition();
 
-    // Get active base values for current voice
-    extern AS5600BaseValues as5600BaseValuesVoice1, as5600BaseValuesVoice2;
-    AS5600BaseValues *activeBaseValues = uiState.isVoice2Mode ? &as5600BaseValuesVoice2 : &as5600BaseValuesVoice1;
-
-    // Calculate slide time (0.0 to 1.0 seconds) with base value offset
-    float slideTimeValue = normalizedPosition * getParameterMaxValue(AS5600ParameterMode::SlideTime) + activeBaseValues->slideTime;
-    slideTimeValue = std::max(0.0f, std::min(slideTimeValue, getParameterMaxValue(AS5600ParameterMode::SlideTime)));
-
-    // Apply slide time to the appropriate voice using VoiceManager
-    extern VoiceManager* voiceManager;
-    if (voiceManager != nullptr)
-    {
-        uint8_t voiceId = uiState.isVoice2Mode ? 1 : 0;
-        voiceManager->setVoiceSlide(voiceId, slideTimeValue);
-    }
 }
 
 

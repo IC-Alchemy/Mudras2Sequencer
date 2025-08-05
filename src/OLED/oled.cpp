@@ -53,6 +53,27 @@ void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Se
         display.display();
         return;
     }
+    
+    // Handle voice parameter editing mode display
+    if (uiState.inVoiceParameterMode && (millis() - uiState.voiceParameterChangeTime < 3000)) {
+        // Show voice parameter info for 3 seconds after change
+        // Note: We need access to voiceManager, leadVoiceId, bassVoiceId from main file
+        // For now, we'll show a placeholder - this will be updated when called from main
+        display.setCursor(5, 5);
+        display.setTextSize(1);
+        display.print("VOICE PARAM MODE");
+        display.setCursor(5, 20);
+        display.print("Button: ");
+        display.print(uiState.lastVoiceParameterButton);
+        display.setCursor(5, 35);
+        display.print("Voice: ");
+        display.print(uiState.isVoice2Mode ? "2" : "1");
+        display.display();
+        return;
+    } else if (uiState.inVoiceParameterMode) {
+        // Clear voice parameter mode after timeout
+        const_cast<UIState&>(uiState).inVoiceParameterMode = false;
+    }
 
     const ParamButtonMapping* heldParam = getHeldParameterButton(uiState);
 
@@ -334,4 +355,92 @@ void OLEDDisplay::displaySettingsMenu(const UIState& uiState) {
         display.setCursor(5, 56);
         display.print("BTN1-2:SEL  BTN8:EDIT");
     }
+}
+
+void OLEDDisplay::displayVoiceParameterInfo(const UIState& uiState, VoiceManager* voiceManager, 
+                                           uint8_t leadVoiceId, uint8_t bassVoiceId) {
+    if (!initialized || !voiceManager) return;
+    
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(SH110X_WHITE);
+    
+    // Get current voice configuration
+    uint8_t currentVoiceId = uiState.isVoice2Mode ? bassVoiceId : leadVoiceId;
+    VoiceConfig* config = voiceManager->getVoiceConfig(currentVoiceId);
+    
+    if (!config) {
+        display.setCursor(5, 20);
+        display.print("Voice config error");
+        display.display();
+        return;
+    }
+    
+    // Header
+    display.setCursor(5, 5);
+    display.setTextSize(1);
+    display.print("VOICE ");
+    display.print(uiState.isVoice2Mode ? "2" : "1");
+    display.print(" PARAMETERS");
+    
+    // Draw separator line
+    display.drawFastHLine(5, 14, SCREEN_WIDTH - 10, SH110X_WHITE);
+    
+    // Parameter information based on button pressed
+    const char* paramName = "";
+    String paramValue = "";
+    
+    switch (uiState.lastVoiceParameterButton) {
+        case 9:
+            paramName = "Envelope";
+            paramValue = config->hasEnvelope ? "ON" : "OFF";
+            break;
+        case 10:
+            paramName = "Overdrive";
+            paramValue = config->hasOverdrive ? "ON" : "OFF";
+            break;
+        case 11:
+            paramName = "Wavefolder";
+            paramValue = config->hasWavefolder ? "ON" : "OFF";
+            break;
+        case 12:
+            {
+                paramName = "Filter Mode";
+                const char* filterNames[] = {"LP12", "LP24", "LP36", "BP12", "BP24"};
+                int mode = static_cast<int>(config->filterMode);
+                if (mode >= 0 && mode < 5) {
+                    paramValue = filterNames[mode];
+                } else {
+                    paramValue = "Unknown";
+                }
+            }
+            break;
+        case 13:
+            paramName = "Filter Res";
+            paramValue = String(config->filterRes, 2);
+            break;
+        default:
+            paramName = "Parameter";
+            paramValue = String(uiState.lastVoiceParameterButton);
+            break;
+    }
+    
+    // Display parameter name
+    display.setCursor(5, 20);
+    display.setTextSize(1);
+    display.print(paramName);
+    display.print(":");
+    
+    // Display parameter value
+    display.setCursor(5, 35);
+    display.setTextSize(2);
+    display.print(paramValue);
+    
+    // Show button number
+    display.setTextSize(1);
+    display.setCursor(5, 55);
+    display.print("Button ");
+    display.print(uiState.lastVoiceParameterButton);
+    
+    display.display();
 }
