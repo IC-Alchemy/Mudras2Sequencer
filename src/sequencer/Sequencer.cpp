@@ -390,19 +390,22 @@ void Sequencer::processStep(uint8_t stepIdx, VoiceState *voiceState)
     // Add a null check to prevent crashes when previewing steps without a valid voiceState
     if (voiceState)
     {
-        // Always update the entire voice state for the audio engine
-      
-        voiceState->filter = filterVal;
-        voiceState->attack = attackVal;
-        voiceState->decay = decayVal;
-        voiceState->note = noteVal; // Store raw note value for audio synthesis (scale array lookup)
-        voiceState->velocity = velocityVal;
-        voiceState->octave = octaveOffset;
+        // Only update voice parameters when gate is active to prevent unwanted pitch changes
+        if (gateOn)
+        {
+            // Update all voice parameters when gate is active
+            voiceState->filter = filterVal;
+            voiceState->attack = attackVal;
+            voiceState->decay = decayVal;
+            voiceState->note = noteVal; // Store raw note value for audio synthesis (scale array lookup)
+            voiceState->velocity = velocityVal;
+            voiceState->octave = octaveOffset;
+            voiceState->slide = slideVal;
+            voiceState->gateLength = noteDurationTicks;
+        }
+        
+        // Always update gate state regardless of its value
         voiceState->gate = gateOn;
-        voiceState->slide = slideVal;
-        voiceState->gateLength = noteDurationTicks;
-
-  
     }
 
     // Update slide state tracking for next step

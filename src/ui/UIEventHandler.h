@@ -12,6 +12,11 @@
 // Forward declarations to prevent circular dependencies
 class Sequencer;
 class MidiNoteManager; // Forward declare MidiNoteManager
+class OLEDDisplay;
+class VoiceManager;
+
+// Callback type for immediate OLED updates
+typedef void (*OLEDUpdateCallback)(const UIState& uiState, VoiceManager* voiceManager);
 
 // =======================
 //   CONSTANTS
@@ -42,6 +47,12 @@ constexpr unsigned long CONTROL_LED_FLASH_DURATION_MS = 250;
  * @param uiState Reference to the central UI state object.
  */
 void initUIEventHandler(UIState& uiState);
+
+/**
+ * @brief Set callback for immediate OLED updates on voice parameter changes
+ * @param callback Function to call for immediate OLED updates
+ */
+void setOLEDUpdateCallback(OLEDUpdateCallback callback);
 
 /**
  * @brief Main matrix event handler function.

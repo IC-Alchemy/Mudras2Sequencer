@@ -5,6 +5,29 @@
 #include "../sequencer/SequencerDefs.h"
 #include "../sensors/as5600.h" // For AS5600ParameterMode
 
+// Forward declarations
+class VoiceManager;
+class OLEDDisplay;
+
+/**
+ * @brief Observer interface for voice parameter changes
+ *
+ * Components that need to be notified of voice parameter changes
+ * should implement this interface and register with the notification system.
+ */
+class VoiceParameterObserver {
+public:
+    virtual ~VoiceParameterObserver() = default;
+
+    /**
+     * Called when a voice parameter is changed
+     * @param voiceId ID of the voice that was modified
+     * @param buttonIndex Button index that triggered the change (9-24)
+     * @param parameterName Human-readable name of the parameter
+     */
+    virtual void onVoiceParameterChanged(uint8_t voiceId, uint8_t buttonIndex, const char* parameterName) = 0;
+};
+
 /**
  * @brief Centralized state management for the PicoMudrasSequencer UI.
  * 
@@ -70,6 +93,43 @@ struct UIState {
    bool inVoiceParameterMode = false;
    uint8_t lastVoiceParameterButton = 0;  // Track which voice parameter was last changed
    unsigned long voiceParameterChangeTime = 0;  // Timestamp of last voice parameter change
+
+   // --- Voice Parameter Change Notification ---
+   bool voiceParameterChanged = false;  // Flag to trigger immediate OLED update
+   uint8_t changedVoiceId = 0;         // ID of voice that was changed
+   const char* changedParameterName = nullptr;  // Name of parameter that was changed
+
+   // --- Observer Registration ---
+   VoiceParameterObserver* voiceParameterObserver = nullptr;  // Single observer for now
+
+   /**
+    * @brief Notify registered observer of voice parameter change
+    * @param voiceId ID of the voice that was modified
+    * @param buttonIndex Button index that triggered the change (9-24)
+    * @param parameterName Human-readable name of the parameter
+    */
+   void notifyVoiceParameterChanged(uint8_t voiceId, uint8_t buttonIndex, const char* parameterName) {
+       // Set flags for immediate OLED update
+       voiceParameterChanged = true;
+       changedVoiceId = voiceId;
+       changedParameterName = parameterName;
+       lastVoiceParameterButton = buttonIndex;
+       voiceParameterChangeTime = millis();
+       inVoiceParameterMode = true;
+
+       // Notify observer if registered
+       if (voiceParameterObserver) {
+           voiceParameterObserver->onVoiceParameterChanged(voiceId, buttonIndex, parameterName);
+       }
+   }
+
+   /**
+    * @brief Clear voice parameter change flags after OLED update
+    */
+   void clearVoiceParameterChangeFlags() {
+       voiceParameterChanged = false;
+       changedParameterName = nullptr;
+   }
 };
 
 #endif // UI_STATE_H

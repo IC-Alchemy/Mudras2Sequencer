@@ -16,11 +16,12 @@
 
 /**
  * @brief OLED Display Manager for PicoMudrasSequencer
- * 
+ *
  * Provides real-time visual feedback for parameter editing,
  * showing which parameter button is held and its current value.
+ * Implements VoiceParameterObserver for immediate updates on voice parameter changes.
  */
-class OLEDDisplay {
+class OLEDDisplay : public VoiceParameterObserver {
 public:
     /**
      * @brief Constructor
@@ -60,10 +61,23 @@ public:
      * @return true if display is ready
      */
     bool isInitialized() const { return initialized; }
+
+    /**
+     * @brief Force immediate display update for voice parameter changes
+     * @param uiState Current UI state
+     * @param voiceManager Pointer to voice manager for accessing voice configs
+     */
+    void forceUpdate(const UIState& uiState, class VoiceManager* voiceManager);
+
+    // VoiceParameterObserver interface implementation
+    void onVoiceParameterChanged(uint8_t voiceId, uint8_t buttonIndex, const char* parameterName) override;
     
 private:
     Adafruit_SH1106G display;
     bool initialized = false;
+
+    // Voice manager reference for immediate updates
+    class VoiceManager* voiceManagerRef = nullptr;
     
     /**
      * @brief Display parameter information

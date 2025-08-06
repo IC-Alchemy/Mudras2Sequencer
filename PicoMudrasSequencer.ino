@@ -648,6 +648,14 @@ void setup1()
     display.begin();
     Serial.println("OLED display initialized");
 
+    // Register OLED display as voice parameter observer
+    uiState.voiceParameterObserver = &display;
+
+    // Set up callback for immediate OLED updates on voice parameter changes
+    setOLEDUpdateCallback([](const UIState& uiState, VoiceManager* voiceManager) {
+        display.forceUpdate(uiState, voiceManager);
+    });
+
     Matrix_init(&touchSensor);
     Serial.println("Matrix initialized");
     
@@ -805,7 +813,12 @@ if ((currentMillis - lastControlUpdate >= CONTROL_UPDATE_INTERVAL)){
         updateStepLEDs(ledMatrix, seq1, seq2, uiState, mm);
         display.update(uiState, seq1, seq2, voiceManager.get());
 
-        updateControlLEDs(ledMatrix, uiState);  
+        // Clear voice parameter change flags after display update
+        if (uiState.voiceParameterChanged) {
+            uiState.clearVoiceParameterChangeFlags();
+        }
+
+        updateControlLEDs(ledMatrix, uiState);
         ledMatrix.show();
     }
         if (uiState.selectedStepForEdit != -1)

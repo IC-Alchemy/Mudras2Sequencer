@@ -24,6 +24,9 @@ extern std::unique_ptr<VoiceManager> voiceManager;
 extern uint8_t leadVoiceId;
 extern uint8_t bassVoiceId;
 
+// Static callback for immediate OLED updates
+static OLEDUpdateCallback oledUpdateCallback = nullptr;
+
 // Helper function declarations (static to this file)
 static bool handleParameterButtonEvent(const MatrixButtonEvent &evt,
                                        UIState &uiState);
@@ -42,6 +45,10 @@ void initUIEventHandler(UIState &uiState) {
   // Initialize default voice preset indices
   uiState.voice1PresetIndex = 0; // Analog preset
   uiState.voice2PresetIndex = 1; // Digital preset
+}
+
+void setOLEDUpdateCallback(OLEDUpdateCallback callback) {
+  oledUpdateCallback = callback;
 }
 
 void matrixEventHandler(const MatrixButtonEvent &evt, UIState &uiState,
@@ -75,19 +82,22 @@ if (evt.buttonIndex == BUTTON_SLIDE_MODE) {
   // Handle Voice Switch (Button 24) with long press for LFO mode
   if (evt.buttonIndex == BUTTON_VOICE_SWITCH) {
     if (evt.type == MATRIX_BUTTON_PRESSED) {
-    
+
         midiNoteManager.onModeSwitch();
         uiState.isVoice2Mode = !uiState.isVoice2Mode;
         uiState.selectedStepForEdit = -1;
         Serial.print("Switched to Voice ");
         Serial.println(uiState.isVoice2Mode ? "2" : "1");
+
+        // Trigger immediate OLED update to show voice switch if in settings mode
+        if (uiState.settingsMode && oledUpdateCallback) {
+          uiState.voiceParameterChanged = true; // Force display update
+          oledUpdateCallback(uiState, voiceManager.get());
+        }
       }
-    
+
     return; // Exit after handling
   }
-
-  // --- Handle step buttons in slide mode ---
-  if (uiState.slideMode && evt.buttonIndex < NUMBER_OF_STEP_BUTTONS) {
     if (evt.type == MATRIX_BUTTON_PRESSED) {
       Sequencer &currentActiveSeq = uiState.isVoice2Mode ? seq2 : seq1;
       uint8_t currentSlideValue = currentActiveSeq.getStepParameterValue(
@@ -101,9 +111,12 @@ if (evt.buttonIndex == BUTTON_SLIDE_MODE) {
       Serial.println(newSlideValue > 0 ? "ON" : "OFF");
     }
     return; // In slide mode, step buttons only toggle slide.
-  }
+  
 
   // Handle other buttons
+  // --- Handle step buttons in slide mode ---
+  if (uiState.slideMode && evt.buttonIndex < NUMBER_OF_STEP_BUTTONS) {
+
   if (handleParameterButtonEvent(evt, uiState))
     return;
   if (handleStepButtonEvent(evt, uiState, seq1, seq2))
@@ -188,7 +201,7 @@ if (evt.buttonIndex == BUTTON_SLIDE_MODE) {
   if (evt.type == MATRIX_BUTTON_PRESSED) {
     handleControlButtonEvent(evt.buttonIndex, uiState, seq1, seq2);
   }
-}
+}}
 
 // =======================
 //   INTERNAL HANDLERS
@@ -259,7 +272,7 @@ static bool handleParameterButtonEvent(const MatrixButtonEvent &evt,
   }
   return false;
 }
-
+                        
 static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
                                   UIState &uiState, Sequencer &seq1,
                                   Sequencer &seq2) {
@@ -294,8 +307,9 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
     } else {
       // Handle voice parameter toggles (buttons 9-24)
       if (evt.buttonIndex >= 9 && evt.buttonIndex <= 24 && voiceManager) {
-              uint8_t voiceIndex = evt.buttonIndex - 9;
-              uint8_t currentVoiceId = voiceIndex;
+              // Use currently selected voice based on uiState.isVoice2Mode
+              uint8_t currentVoiceId = uiState.isVoice2Mode ? bassVoiceId : leadVoiceId;
+              uint8_t voiceDisplayNumber = uiState.isVoice2Mode ? 2 : 1;
               VoiceConfig* config = voiceManager->getVoiceConfig(currentVoiceId);
       
               if (config) {
@@ -308,25 +322,28 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
                   case 9: // Toggle hasEnvelope per voice
                     config->hasEnvelope = !config->hasEnvelope;
                     Serial.print("Voice ");
-                    Serial.print(voiceIndex + 1);
+                    Serial.print(voiceDisplayNumber);
                     Serial.print(" envelope ");
                     Serial.println(config->hasEnvelope ? "ON" : "OFF");
+                    uiState.notifyVoiceParameterChanged(currentVoiceId, evt.buttonIndex, "Envelope");
                     break;
-      
+
                   case 10: // Toggle hasOverdrive
                     config->hasOverdrive = !config->hasOverdrive;
                     Serial.print("Voice ");
-                    Serial.print(voiceIndex + 1);
+                    Serial.print(voiceDisplayNumber);
                     Serial.print(" overdrive ");
                     Serial.println(config->hasOverdrive ? "ON" : "OFF");
+                    uiState.notifyVoiceParameterChanged(currentVoiceId, evt.buttonIndex, "Overdrive");
                     break;
-      
+
                   case 11: // Toggle hasWavefolder
                     config->hasWavefolder = !config->hasWavefolder;
                     Serial.print("Voice ");
-                    Serial.print(voiceIndex + 1);
+                    Serial.print(voiceDisplayNumber);
                     Serial.print(" wavefolder ");
                     Serial.println(config->hasWavefolder ? "ON" : "OFF");
+                    uiState.notifyVoiceParameterChanged(currentVoiceId, evt.buttonIndex, "Wavefolder");
                     break;
       
                   case 12: // Cycle through filterMode
@@ -337,9 +354,10 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
       
                       const char* filterNames[] = {"LP12", "LP24", "LP36", "BP12", "BP24"};
                       Serial.print("Voice ");
-                      Serial.print(voiceIndex + 1);
+                      Serial.print(voiceDisplayNumber);
                       Serial.print(" filter mode: ");
                       Serial.println(filterNames[currentMode]);
+                      uiState.notifyVoiceParameterChanged(currentVoiceId, evt.buttonIndex, "Filter Mode");
                     }
                     break;
                   case 13: // Cycle through filter resonance amounts
@@ -350,17 +368,19 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
                       config->filterRes = currentResonance;
       
                       Serial.print("Voice ");
-                      Serial.print(voiceIndex + 1);
+                      Serial.print(voiceDisplayNumber);
                       Serial.print(" filter resonance: ");
                       Serial.println(currentResonance, 2);
+                      uiState.notifyVoiceParameterChanged(currentVoiceId, evt.buttonIndex, "Filter Resonance");
                     }
                     break;
                   case 14:
                     config->hasDalek = !config->hasDalek;
                     Serial.print("Voice ");
-                    Serial.print(voiceIndex + 1);
+                    Serial.print(voiceDisplayNumber);
                     Serial.print(" dalek ");
                     Serial.println(config->hasDalek ? "ON" : "OFF");
+                    uiState.notifyVoiceParameterChanged(currentVoiceId, evt.buttonIndex, "Dalek");
                     break;
       
                   default:
@@ -373,6 +393,24 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
       
                 // Apply the updated configuration to the voice
                 voiceManager->setVoiceConfig(currentVoiceId, *config);
+
+                // Debug output for state synchronization verification
+                Serial.print("State Sync Debug - VoiceID: ");
+                Serial.print(currentVoiceId);
+                Serial.print(", Button: ");
+                Serial.print(evt.buttonIndex);
+                Serial.print(", UIState.voiceParameterChanged: ");
+                Serial.print(uiState.voiceParameterChanged);
+                Serial.print(", UIState.isVoice2Mode: ");
+                Serial.println(uiState.isVoice2Mode);
+
+                // Trigger immediate OLED update if callback is set
+                if (oledUpdateCallback) {
+                  Serial.println("Triggering immediate OLED update via callback");
+                  oledUpdateCallback(uiState, voiceManager.get());
+                } else {
+                  Serial.println("Warning: OLED update callback not set!");
+                }
               }
             }
       // When in main settings menu, handle voice selection
@@ -605,4 +643,5 @@ void pollUIHeldButtons(UIState &uiState, Sequencer &seq1, Sequencer &seq2) {
       Serial.println("Seq 2 reset by long press");
     }
   }
+
 }

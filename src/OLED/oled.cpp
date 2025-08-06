@@ -39,34 +39,55 @@ void OLEDDisplay::clear() {
 
 void OLEDDisplay::displayVoiceParameterToggles(const UIState& uiState, VoiceManager* voiceManager) {
     if (!initialized || !voiceManager) return;
-    
+
     display.clearDisplay();
     display.setTextSize(1);
     display.setTextColor(SH110X_WHITE);
-    
-    // Compact header
+
+    // Draw border for professional look
+    display.drawRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, SH110X_WHITE);
+
+    // Compact header with current voice indicator
     display.setCursor(2, 2);
-    display.print("VOICE PARAMS");
-    
+    display.print("VOICE PARAMS - V");
+    display.print(uiState.isVoice2Mode ? "2" : "1");
+    display.print(" ACTIVE");
+
     // Draw separator line
     display.drawFastHLine(2, 10, SCREEN_WIDTH - 4, SH110X_WHITE);
-    
+
+    // Get external voice IDs
+    extern uint8_t leadVoiceId;
+    extern uint8_t bassVoiceId;
+
     // Compact parameter display for 2 voices
-    const char* paramNames[] = {"Env", "OvD", "W", "F", "R", "D"}; // Single letters
+    const char* paramNames[] = {"E", "O", "W", "F", "R", "D"}; // Single letters
     const int paramButtons[] = {9, 10, 11, 12, 13, 14};
     const int numParams = 6;
-    
-    // Show parameters for first 2 voices in compact grid
-    for (int voice = 0; voice < 2; voice++) {
-        VoiceConfig* config = voiceManager->getVoiceConfig(voice);
+
+    // Voice IDs to display
+    uint8_t voiceIds[] = {leadVoiceId, bassVoiceId};
+    const char* voiceLabels[] = {"V1", "V2"};
+
+    // Show parameters for both voices in compact grid
+    for (int voiceIndex = 0; voiceIndex < 2; voiceIndex++) {
+        uint8_t voiceId = voiceIds[voiceIndex];
+        VoiceConfig* config = voiceManager->getVoiceConfig(voiceId);
         if (!config) continue;
-        
-        int yStart = 13 + (voice * 18);
-        
-        // Voice header
+
+        int yStart = 13 + (voiceIndex * 18);
+
+        // Voice header with selection indicator
         display.setCursor(2, yStart);
-        display.print("V");
-        display.print(voice + 1);
+        bool isCurrentVoice = (voiceIndex == 0 && !uiState.isVoice2Mode) ||
+                             (voiceIndex == 1 && uiState.isVoice2Mode);
+
+        if (isCurrentVoice) {
+            display.print(">");  // Indicate currently selected voice
+        } else {
+            display.print(" ");
+        }
+        display.print(voiceLabels[voiceIndex]);
         
         // Parameter states in compact format
         for (int i = 0; i < numParams; i++) {
@@ -119,6 +140,9 @@ void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Se
 void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Sequencer& seq2, VoiceManager* voiceManager) {
     if (!initialized) return;
 
+    // Store voice manager reference for immediate updates
+    voiceManagerRef = voiceManager;
+
     display.clearDisplay();
     display.setTextSize(1);
     display.setTextColor(SH110X_WHITE);
@@ -131,11 +155,13 @@ void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Se
         // Check if we should show voice parameter toggles
         // Show toggles if we have voiceManager and either in voice parameter mode
         // or if we recently changed a voice parameter (within 5 seconds)
-        bool showVoiceToggles = voiceManager && 
-            (uiState.inVoiceParameterMode || 
-             (uiState.voiceParameterChangeTime > 0 && 
+        // Also show immediately if voiceParameterChanged flag is set
+        bool showVoiceToggles = voiceManager &&
+            (uiState.inVoiceParameterMode ||
+             uiState.voiceParameterChanged ||
+             (uiState.voiceParameterChangeTime > 0 &&
               (millis() - uiState.voiceParameterChangeTime < 5000)));
-              
+
         if (showVoiceToggles) {
             displayVoiceParameterToggles(uiState, voiceManager);
         } else {
@@ -444,7 +470,7 @@ void OLEDDisplay::displaySettingsMenu(const UIState& uiState) {
         
         // Instructions at bottom
         display.setCursor(5, 56);
-        display.print("BTN1-2:SEL  BTN8:EDIT  BTN9-24:PARAMS");
+        display.print("B 1-2:SEL  B 8:EDIT  B 9-24:PARAMS");
     }
 }
 
@@ -534,4 +560,55 @@ void OLEDDisplay::displayVoiceParameterInfo(const UIState& uiState, VoiceManager
     display.print(uiState.lastVoiceParameterButton);
     
     display.display();
+}
+
+void OLEDDisplay::forceUpdate(const UIState& uiState, VoiceManager* voiceManager) {
+    if (!initialized) {
+        Serial.println("OLED: Force update failed - display not initialized");
+        return;
+    }
+
+    if (!voiceManager) {
+        Serial.println("OLED: Force update failed - voiceManager is null");
+        return;
+    }
+
+    // Store voice manager reference
+    voiceManagerRef = voiceManager;
+
+    Serial.print("OLED: Force update called - settingsMode: ");
+    Serial.print(uiState.settingsMode);
+    Serial.print(", voiceParameterChanged: ");
+    Serial.print(uiState.voiceParameterChanged);
+    Serial.print(", inVoiceParameterMode: ");
+    Serial.println(uiState.inVoiceParameterMode);
+
+    // Force immediate display update for voice parameter changes
+    if (uiState.settingsMode && (uiState.voiceParameterChanged || uiState.inVoiceParameterMode)) {
+        Serial.println("OLED: Conditions met - updating display");
+
+        // Display voice parameter toggles immediately (this handles its own display setup)
+        displayVoiceParameterToggles(uiState, voiceManager);
+        display.display();
+
+        Serial.println("OLED: Force update completed - displaying voice parameter toggles");
+    } else {
+        Serial.println("OLED: Conditions not met for force update");
+    }
+}
+
+void OLEDDisplay::onVoiceParameterChanged(uint8_t voiceId, uint8_t buttonIndex, const char* parameterName) {
+    // This method is called immediately when a voice parameter changes
+    // We can use the stored voiceManagerRef to force an immediate update
+    if (voiceManagerRef && initialized) {
+        // Create a temporary UIState with the change information
+        // Note: In a real implementation, we'd need access to the actual UIState
+        // For now, we'll rely on the forceUpdate method being called from the main loop
+        Serial.print("OLED: Voice parameter changed - Voice ");
+        Serial.print(voiceId);
+        Serial.print(", Button ");
+        Serial.print(buttonIndex);
+        Serial.print(", Parameter: ");
+        Serial.println(parameterName);
+    }
 }
