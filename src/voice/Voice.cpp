@@ -153,7 +153,7 @@ float Voice::process() {
 
   // Apply effects chain
   processEffectsChain(mixedOscillators);
-  mixedOscillators *= (.3f + (.7f * state.velocity));
+  mixedOscillators *= (.25f + (  state.velocity));
   // Apply filter
   float filteredSignal = filter.Process(mixedOscillators);
 

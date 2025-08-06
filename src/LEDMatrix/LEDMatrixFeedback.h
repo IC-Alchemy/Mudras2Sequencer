@@ -2,6 +2,7 @@
 #define LEDMATRIX_FEEDBACK_H
 
 #include "ledMatrix.h"
+#include "../voice/VoiceManager.h"
 
 // Forward declarations to break circular dependencies
 class Sequencer;
@@ -34,7 +35,7 @@ void updateSettingsModeLEDs(LEDMatrix& ledMatrix, const UIState& uiState);
  * Highlights the voice parameter button that was pressed (buttons 9-24)
  * with a visual indication of the parameter state (on/off/value)
  */
-void updateVoiceParameterLEDs(LEDMatrix& ledMatrix, const UIState& uiState);
+void updateVoiceParameterLEDs(LEDMatrix& ledMatrix, const UIState& uiState, class VoiceManager* voiceManager, uint8_t leadVoiceId, uint8_t bassVoiceId);
 
 
 void setStepLedColor(uint8_t step, uint8_t r, uint8_t g, uint8_t b);
