@@ -7,6 +7,19 @@
 #include "../ui/UIState.h"
 #include "../ui/ButtonManager.h"
 #include "../sequencer/Sequencer.h"
+#include "../sequencer/SequencerDefs.h"
+
+/**
+ * @brief Observer interface for voice parameter changes
+ * 
+ * Provides immediate callback system for real-time OLED updates
+ */
+class VoiceParameterObserver {
+public:
+    virtual ~VoiceParameterObserver() = default;
+    virtual void onVoiceParameterChanged(uint8_t voiceId, const VoiceState& state) = 0;
+    virtual void onVoiceSwitched(uint8_t newVoiceId) = 0;
+};
 
 // OLED Configuration
 #define OLED_I2C_ADDRESS 0x3C
@@ -19,8 +32,9 @@
  * 
  * Provides real-time visual feedback for parameter editing,
  * showing which parameter button is held and its current value.
+ * Implements VoiceParameterObserver for immediate updates.
  */
-class OLEDDisplay {
+class OLEDDisplay : public VoiceParameterObserver {
 public:
     /**
      * @brief Constructor
@@ -60,7 +74,34 @@ public:
      * @return true if display is ready
      */
     bool isInitialized() const { return initialized; }
-    
+
+    /**
+     * @brief Set the voice manager reference for parameter updates
+     * @param voiceManager Pointer to the voice manager
+     */
+    void setVoiceManager(class VoiceManager* voiceManager);
+
+    // VoiceParameterObserver interface implementation
+    /**
+     * @brief Callback for when a voice parameter changes
+     * @param voiceId ID of the voice that changed
+     * @param state Current voice state containing all parameter values
+     */
+    void onVoiceParameterChanged(uint8_t voiceId, const VoiceState& state) override;
+
+    /**
+     * @brief Callback for when voice is switched (interface requirement)
+     * @param newVoiceId ID of the newly selected voice
+     */
+    void onVoiceSwitched(uint8_t newVoiceId) override;
+
+    /**
+     * @brief Handle voice switching with immediate OLED update (extended version)
+     * @param uiState Current UI state
+     * @param voiceManager Pointer to voice manager
+     */
+    void onVoiceSwitched(const UIState& uiState, class VoiceManager* voiceManager);
+
 private:
     Adafruit_SH1106G display;
     bool initialized = false;
@@ -105,6 +146,16 @@ private:
      * @param voiceManager Pointer to voice manager for accessing voice configs
      */
     void displayVoiceParameterToggles(const UIState& uiState, class VoiceManager* voiceManager);
+    
+    /**
+     * @brief Force immediate update of the display for voice parameter changes
+     * @param uiState Current UI state
+     * @param voiceManager Pointer to voice manager for accessing voice configs
+     */
+    void forceUpdate(const UIState& uiState, class VoiceManager* voiceManager);
+
+private:
+    class VoiceManager* voiceManagerRef = nullptr; // Reference to voice manager for immediate updates
 
 };
 

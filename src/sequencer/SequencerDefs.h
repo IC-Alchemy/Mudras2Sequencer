@@ -146,7 +146,7 @@ constexpr ParameterDefinition CORE_PARAMETERS[] = {
     {"Attack", 0.01f, 0.0f, 1.f, false, DEFAULT_STEPS},  // ParamId::Attack - Default: float
     {"Decay", 0.11f, 0.f, 1.0f, false, DEFAULT_STEPS},    // ParamId::Decay - Default: float
     {"Octave", 0.0f, 0.f, 1.0f, false, DEFAULT_STEPS},    // ParamId::Octave - Default: float (interpreted as -1, 0, 1)
-    {"GateLength", 0.1f, 0.01f, 1.0f, false, DEFAULT_STEPS}, // ParamId::GateLength - Default: float
+    {"GateLength", 0.1f, 0.001f, 1.0f, false, DEFAULT_STEPS}, // ParamId::GateLength - Default: float
     {"Gate", false, false, true, true, DEFAULT_STEPS},      // ParamId::Gate - Default: bool
     {"Slide", false, false, true, true, DEFAULT_STEPS}     // ParamId::Slide - Default: bool
 };

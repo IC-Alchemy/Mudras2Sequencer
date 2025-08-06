@@ -206,6 +206,14 @@ void Voice::processEffectsChain(float &signal) {
 }
 
 void Voice::updateOscillatorFrequencies() {
+  // GATE-CONTROLLED FREQUENCY UPDATES: Only update oscillator frequencies when gate is HIGH
+  // This works in conjunction with the sequencer's gate-controlled note output
+  // The sequencer only updates state.note and state.octave when gate is HIGH,
+  // but we add this check as an additional safeguard and optimization
+  if (!state.gate) {
+    return; // Skip frequency updates when gate is LOW
+  }
+
   // Update each oscillator with harmony intervals and detuning
   for (size_t i = 0; i < oscillators.size() && i < 3; i++) {
     // Calculate frequency for this oscillator using harmony interval

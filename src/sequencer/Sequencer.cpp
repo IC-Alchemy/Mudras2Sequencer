@@ -130,6 +130,19 @@ float Sequencer::getStepParameterValue(ParamId id, uint8_t stepIdx) const
 
 void Sequencer::setStepParameterValue(ParamId id, uint8_t stepIdx, float value)
 {
+    // GATE-CONTROLLED NOTE PROGRAMMING: Prevent Note parameter changes on steps with LOW gates
+    if (id == ParamId::Note)
+    {
+        // Check if the step's gate is HIGH before allowing note programming
+        float gateValue = getStepParameterValue(ParamId::Gate, stepIdx);
+        if (gateValue <= 0.5f) // Gate is LOW (0.0)
+        {
+            // Silently ignore note programming attempts on steps with LOW gates
+            // This protects steps from note frequency changes during programming/editing
+            return;
+        }
+    }
+
     parameterManager.setValue(id, stepIdx, value);
 }
 
@@ -251,6 +264,18 @@ void Sequencer::advanceStep(uint8_t current_uclock_step, int mm_distance,
         {
             if (pb.held)
             {
+                // GATE-CONTROLLED NOTE PROGRAMMING: Check gate restriction for Note parameter
+                if (pb.id == ParamId::Note)
+                {
+                    uint8_t paramStepIdx = currentStepPerParam[static_cast<size_t>(pb.id)];
+                    float gateValue = getStepParameterValue(ParamId::Gate, paramStepIdx);
+                    if (gateValue <= 0.5f) // Gate is LOW (0.0)
+                    {
+                        // Skip Note parameter recording on steps with LOW gates
+                        continue;
+                    }
+                }
+
                 parametersRecorded = true;
 
                 // For all other parameters, scale the normalized value to the parameter's range
@@ -390,19 +415,24 @@ void Sequencer::processStep(uint8_t stepIdx, VoiceState *voiceState)
     // Add a null check to prevent crashes when previewing steps without a valid voiceState
     if (voiceState)
     {
-        // Always update the entire voice state for the audio engine
-      
+        // Always update non-frequency parameters regardless of gate state
         voiceState->filter = filterVal;
         voiceState->attack = attackVal;
         voiceState->decay = decayVal;
-        voiceState->note = noteVal; // Store raw note value for audio synthesis (scale array lookup)
         voiceState->velocity = velocityVal;
-        voiceState->octave = octaveOffset;
         voiceState->gate = gateOn;
         voiceState->slide = slideVal;
         voiceState->gateLength = noteDurationTicks;
 
-  
+        // GATE-CONTROLLED NOTE OUTPUT: Only update note and octave when gate is HIGH
+        // This allows current notes to continue/fade when gate is LOW
+        if (gateOn)
+        {
+            voiceState->note = noteVal; // Store raw note value for audio synthesis (scale array lookup)
+            voiceState->octave = octaveOffset;
+        }
+        // When gate is LOW, preserve the previous note and octave values
+        // allowing the current note to continue playing or fade naturally
     }
 
     // Update slide state tracking for next step

@@ -79,8 +79,13 @@ if (evt.buttonIndex == BUTTON_SLIDE_MODE) {
         midiNoteManager.onModeSwitch();
         uiState.isVoice2Mode = !uiState.isVoice2Mode;
         uiState.selectedStepForEdit = -1;
+        uiState.voiceSwitchTriggered = true;  // Set flag for immediate OLED update
         Serial.print("Switched to Voice ");
         Serial.println(uiState.isVoice2Mode ? "2" : "1");
+        
+        // Trigger immediate OLED update for voice switching
+        // Note: This requires access to the global display and voiceManager objects
+        // The actual call will be made from the main file where these objects are accessible
       }
     
     return; // Exit after handling
@@ -294,8 +299,8 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
     } else {
       // Handle voice parameter toggles (buttons 9-24)
       if (evt.buttonIndex >= 9 && evt.buttonIndex <= 24 && voiceManager) {
-              uint8_t voiceIndex = evt.buttonIndex - 9;
-              uint8_t currentVoiceId = voiceIndex;
+              // Use the currently selected voice (respecting isVoice2Mode) instead of button index
+              uint8_t currentVoiceId = uiState.isVoice2Mode ? bassVoiceId : leadVoiceId;
               VoiceConfig* config = voiceManager->getVoiceConfig(currentVoiceId);
       
               if (config) {
@@ -303,28 +308,31 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
                 uiState.inVoiceParameterMode = true;
                 uiState.lastVoiceParameterButton = evt.buttonIndex;
                 uiState.voiceParameterChangeTime = millis();
-      
+
+                // Get the correct voice number for display (1 or 2)
+                uint8_t displayVoiceNumber = uiState.isVoice2Mode ? 2 : 1;
+
                 switch (evt.buttonIndex) {
                   case 9: // Toggle hasEnvelope per voice
                     config->hasEnvelope = !config->hasEnvelope;
                     Serial.print("Voice ");
-                    Serial.print(voiceIndex + 1);
+                    Serial.print(displayVoiceNumber);
                     Serial.print(" envelope ");
                     Serial.println(config->hasEnvelope ? "ON" : "OFF");
                     break;
-      
+
                   case 10: // Toggle hasOverdrive
                     config->hasOverdrive = !config->hasOverdrive;
                     Serial.print("Voice ");
-                    Serial.print(voiceIndex + 1);
+                    Serial.print(displayVoiceNumber);
                     Serial.print(" overdrive ");
                     Serial.println(config->hasOverdrive ? "ON" : "OFF");
                     break;
-      
+
                   case 11: // Toggle hasWavefolder
                     config->hasWavefolder = !config->hasWavefolder;
                     Serial.print("Voice ");
-                    Serial.print(voiceIndex + 1);
+                    Serial.print(displayVoiceNumber);
                     Serial.print(" wavefolder ");
                     Serial.println(config->hasWavefolder ? "ON" : "OFF");
                     break;
@@ -334,10 +342,10 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
                       int currentMode = static_cast<int>(config->filterMode);
                       currentMode = (currentMode + 1) % 5; // Cycle through 5 filter modes
                       config->filterMode = static_cast<daisysp::LadderFilter::FilterMode>(currentMode);
-      
+
                       const char* filterNames[] = {"LP12", "LP24", "LP36", "BP12", "BP24"};
                       Serial.print("Voice ");
-                      Serial.print(voiceIndex + 1);
+                      Serial.print(displayVoiceNumber);
                       Serial.print(" filter mode: ");
                       Serial.println(filterNames[currentMode]);
                     }
@@ -348,9 +356,9 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
                       currentResonance += 0.1f;
                       if (currentResonance > 1.0f) currentResonance = 0.0f;
                       config->filterRes = currentResonance;
-      
+
                       Serial.print("Voice ");
-                      Serial.print(voiceIndex + 1);
+                      Serial.print(displayVoiceNumber);
                       Serial.print(" filter resonance: ");
                       Serial.println(currentResonance, 2);
                     }
@@ -358,7 +366,7 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
                   case 14:
                     config->hasDalek = !config->hasDalek;
                     Serial.print("Voice ");
-                    Serial.print(voiceIndex + 1);
+                    Serial.print(displayVoiceNumber);
                     Serial.print(" dalek ");
                     Serial.println(config->hasDalek ? "ON" : "OFF");
                     break;

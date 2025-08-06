@@ -70,6 +70,9 @@ struct UIState {
    bool inVoiceParameterMode = false;
    uint8_t lastVoiceParameterButton = 0;  // Track which voice parameter was last changed
    unsigned long voiceParameterChangeTime = 0;  // Timestamp of last voice parameter change
+   
+   // --- Voice Switch State ---
+   bool voiceSwitchTriggered = false;  // Flag to trigger immediate OLED update for voice switching
 };
 
 #endif // UI_STATE_H
