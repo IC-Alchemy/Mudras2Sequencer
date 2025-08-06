@@ -37,7 +37,86 @@ void OLEDDisplay::clear() {
     display.display();
 }
 
+void OLEDDisplay::displayVoiceParameterToggles(const UIState& uiState, VoiceManager* voiceManager) {
+    if (!initialized || !voiceManager) return;
+    
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(SH110X_WHITE);
+    
+    // Compact header
+    display.setCursor(2, 2);
+    display.print("VOICE PARAMS");
+    
+    // Draw separator line
+    display.drawFastHLine(2, 10, SCREEN_WIDTH - 4, SH110X_WHITE);
+    
+    // Compact parameter display for 2 voices
+    const char* paramNames[] = {"Env", "OvD", "W", "F", "R", "D"}; // Single letters
+    const int paramButtons[] = {9, 10, 11, 12, 13, 14};
+    const int numParams = 6;
+    
+    // Show parameters for first 2 voices in compact grid
+    for (int voice = 0; voice < 2; voice++) {
+        VoiceConfig* config = voiceManager->getVoiceConfig(voice);
+        if (!config) continue;
+        
+        int yStart = 13 + (voice * 18);
+        
+        // Voice header
+        display.setCursor(2, yStart);
+        display.print("V");
+        display.print(voice + 1);
+        
+        // Parameter states in compact format
+        for (int i = 0; i < numParams; i++) {
+            int xPos = 18 + (i * 18); // Tighter spacing
+            display.setCursor(xPos, yStart);
+            
+            // Get parameter state
+            bool paramState = false;
+            switch (paramButtons[i]) {
+                case 9: paramState = config->hasEnvelope; break;
+                case 10: paramState = config->hasOverdrive; break;
+                case 11: paramState = config->hasWavefolder; break;
+                case 12: 
+                    // Show filter mode as number (0-4)
+                    display.print(static_cast<int>(config->filterMode));
+                    continue;
+                case 13:
+                    // Show resonance as 2-digit percentage
+                    display.print((int)(config->filterRes * 100));
+                    continue;
+                case 14: paramState = config->hasDalek; break;
+            }
+            
+            // Display compact ON/OFF state
+            if (paramButtons[i] != 12 && paramButtons[i] != 13) {
+                display.print(paramState ? "1" : "0"); // Use 1/0 instead of ON/OFF
+            }
+        }
+        
+        // Parameter labels on second line (single letters)
+        for (int i = 0; i < numParams; i++) {
+            int xPos = 18 + (i * 18);
+            display.setCursor(xPos, yStart + 8);
+            display.print(paramNames[i]);
+        }
+    }
+    
+    // Compact instructions at bottom
+    display.setCursor(2, 56);
+    display.print("9-14:TOG 8:BACK");
+    
+    display.display();
+}
+
 void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Sequencer& seq2) {
+    // Call the overloaded version with nullptr for voiceManager
+    update(uiState, seq1, seq2, nullptr);
+}
+
+void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Sequencer& seq2, VoiceManager* voiceManager) {
     if (!initialized) return;
 
     display.clearDisplay();
@@ -49,7 +128,19 @@ void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Se
 
     // Handle settings mode display
     if (uiState.settingsMode) {
-        displaySettingsMenu(uiState);
+        // Check if we should show voice parameter toggles
+        // Show toggles if we have voiceManager and either in voice parameter mode
+        // or if we recently changed a voice parameter (within 5 seconds)
+        bool showVoiceToggles = voiceManager && 
+            (uiState.inVoiceParameterMode || 
+             (uiState.voiceParameterChangeTime > 0 && 
+              (millis() - uiState.voiceParameterChangeTime < 5000)));
+              
+        if (showVoiceToggles) {
+            displayVoiceParameterToggles(uiState, voiceManager);
+        } else {
+            displaySettingsMenu(uiState);
+        }
         display.display();
         return;
     }
@@ -353,7 +444,7 @@ void OLEDDisplay::displaySettingsMenu(const UIState& uiState) {
         
         // Instructions at bottom
         display.setCursor(5, 56);
-        display.print("BTN1-2:SEL  BTN8:EDIT");
+        display.print("BTN1-2:SEL  BTN8:EDIT  BTN9-24:PARAMS");
     }
 }
 

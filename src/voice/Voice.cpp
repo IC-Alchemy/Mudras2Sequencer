@@ -78,7 +78,7 @@ void Voice::init(float sr) {
   // Initialize effects
   if (config.hasOverdrive) {
     overdrive.Init();
-    overdrive.SetDrive(config.overdriveAmount);
+    overdrive.SetDrive(config.overdriveDrive);
   }
 
   if (config.hasWavefolder) {
@@ -117,7 +117,7 @@ float Voice::process() {
   }
 
   // Process envelope
-  float envelopeValue = envelope.Process(gate);
+  float envelopeValue = config.hasEnvelope ? envelope.Process(gate) : 1.0f;
 
   // Update filter frequency with envelope modulation
   filter.SetFreq(100.f + (filterFrequency * envelopeValue) +
@@ -197,7 +197,7 @@ void Voice::setSequencer(Sequencer *seq) {
 void Voice::processEffectsChain(float &signal) {
 
   if (config.hasOverdrive) {
-    signal = overdrive.Process(signal * config.overdriveAmount);
+    signal = overdrive.Process(signal * config.overdriveGain);
   }
 
   if (config.hasWavefolder) {
@@ -303,8 +303,8 @@ VoiceConfig getAnalogVoice() {
   config.oscAmplitudes[1] = .33f;
   config.oscAmplitudes[2] = .33f;
   config.oscDetuning[0] = 0.0f;
-  config.oscDetuning[1] = 0.001f;  // Slight detune
-  config.oscDetuning[2] = -0.001f; // Slight detune opposite
+  config.oscDetuning[1] = 0.007f;  // Slight detune
+  config.oscDetuning[2] = -0.007f; // Slight detune opposite`
   config.harmony[0] = 0;           // Root note
   config.harmony[1] = 0;           // Unison (no harmony)
   config.harmony[2] = 0;           // Unison (no harmony)
@@ -317,7 +317,8 @@ VoiceConfig getAnalogVoice() {
 
   config.hasOverdrive = false;
   config.hasWavefolder = false;
-  config.overdriveAmount = 0.25f;
+  config.overdriveGain = 0.3f;
+  config.overdriveDrive = 0.25f;
   config.wavefolderGain = 1.5f;
   config.wavefolderOffset = 1.0f;
 
@@ -353,7 +354,8 @@ VoiceConfig getDigitalVoice() {
 
   config.hasOverdrive = false;
   config.hasWavefolder = false;
-  config.overdriveAmount = 0.21f;
+  config.overdriveGain = 0.3f;
+  config.overdriveDrive = 0.21f;
   config.wavefolderGain = 5.0f;
   config.defaultAttack = 0.015f;
   config.defaultDecay = 0.1f;
@@ -384,7 +386,8 @@ VoiceConfig getBassVoice() {
   config.filterMode = daisysp::LadderFilter::FilterMode::LP24;
   config.hasWavefolder = false;
   config.hasOverdrive = false;
-  config.overdriveAmount = 0.15f; // Subtle overdrive
+  config.overdriveGain = 0.15f;
+  config.overdriveDrive = 0.15f; // Subtle overdrive
 
   config.defaultAttack = 0.01f;
   config.defaultDecay = 0.3f;
@@ -417,7 +420,8 @@ VoiceConfig getLeadVoice() {
   config.filterMode = daisysp::LadderFilter::FilterMode::LP24;
   config.hasOverdrive = false;
   config.hasWavefolder = false;
-  config.overdriveAmount = 0.25f;
+  config.overdriveGain = 0.2f;
+  config.overdriveDrive = 0.25f;
   config.wavefolderGain = 5.0f;
 
   config.defaultAttack = 0.02f;
@@ -486,7 +490,8 @@ VoiceConfig getPercussionVoice() {
 
   config.hasOverdrive = true;
   config.hasWavefolder = true;
-  config.overdriveAmount = 0.3f;
+  config.overdriveGain = 0.25f;
+  config.overdriveDrive = 0.3f;
   config.wavefolderGain = 3.0f;
 
   config.defaultAttack = 0.001f; // Very fast attack

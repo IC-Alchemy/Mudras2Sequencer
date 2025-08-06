@@ -44,10 +44,10 @@ struct VoiceConfig {
     bool hasWavefolder = false;
     bool hasEnvelope = true; // Enable envelope by default
     bool hasDalek = false;
-
-    float overdriveAmount = 0.25f;
-    float wavefolderGain = 1.5f;
-    float wavefolderOffset = 1.0f;
+float overdriveGain =.4f;
+    float overdriveDrive = 0.25f;
+    float wavefolderGain = 3.5f;
+    float wavefolderOffset = 2.0f;
     
     // Envelope default settings
     float defaultAttack = 0.04f;

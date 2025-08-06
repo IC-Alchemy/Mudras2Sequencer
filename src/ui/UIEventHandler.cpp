@@ -294,88 +294,87 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
     } else {
       // Handle voice parameter toggles (buttons 9-24)
       if (evt.buttonIndex >= 9 && evt.buttonIndex <= 24 && voiceManager) {
-        uint8_t currentVoiceId = uiState.isVoice2Mode ? bassVoiceId : leadVoiceId;
-        VoiceConfig* config = voiceManager->getVoiceConfig(currentVoiceId);
-        
-        if (config) {
-          // Set voice parameter editing state
-          uiState.inVoiceParameterMode = true;
-          uiState.lastVoiceParameterButton = evt.buttonIndex;
-          uiState.voiceParameterChangeTime = millis();
-          
-          switch (evt.buttonIndex) {
-            case 9: // Toggle hasEnvelope
-              config->hasEnvelope = !config->hasEnvelope;
-              Serial.print("Voice ");
-              Serial.print(uiState.isVoice2Mode ? "2" : "1");
-              Serial.print(" envelope ");
-              Serial.println(config->hasEnvelope ? "ON" : "OFF");
-              break;
-              
-            case 10: // Toggle hasOverdrive
-              config->hasOverdrive = !config->hasOverdrive;
-              Serial.print("Voice ");
-              Serial.print(uiState.isVoice2Mode ? "2" : "1");
-              Serial.print(" overdrive ");
-              Serial.println(config->hasOverdrive ? "ON" : "OFF");
-              break;
-              
-            case 11: // Toggle hasWavefolder
-              config->hasWavefolder = !config->hasWavefolder;
-              Serial.print("Voice ");
-              Serial.print(uiState.isVoice2Mode ? "2" : "1");
-              Serial.print(" wavefolder ");
-              Serial.println(config->hasWavefolder ? "ON" : "OFF");
-              break;
-              
-            case 12: // Cycle through filterMode
-              {
-                int currentMode = static_cast<int>(config->filterMode);
-                currentMode = (currentMode + 1) % 5; // Cycle through 5 filter modes
-                config->filterMode = static_cast<daisysp::LadderFilter::FilterMode>(currentMode);
-                
-                const char* filterNames[] = {"LP12", "LP24", "LP36", "BP12", "BP24"};
-                Serial.print("Voice ");
-                Serial.print(uiState.isVoice2Mode ? "2" : "1");
-                Serial.print(" filter mode: ");
-                Serial.println(filterNames[currentMode]);
+              uint8_t voiceIndex = evt.buttonIndex - 9;
+              uint8_t currentVoiceId = voiceIndex;
+              VoiceConfig* config = voiceManager->getVoiceConfig(currentVoiceId);
+      
+              if (config) {
+                // Set voice parameter editing state
+                uiState.inVoiceParameterMode = true;
+                uiState.lastVoiceParameterButton = evt.buttonIndex;
+                uiState.voiceParameterChangeTime = millis();
+      
+                switch (evt.buttonIndex) {
+                  case 9: // Toggle hasEnvelope per voice
+                    config->hasEnvelope = !config->hasEnvelope;
+                    Serial.print("Voice ");
+                    Serial.print(voiceIndex + 1);
+                    Serial.print(" envelope ");
+                    Serial.println(config->hasEnvelope ? "ON" : "OFF");
+                    break;
+      
+                  case 10: // Toggle hasOverdrive
+                    config->hasOverdrive = !config->hasOverdrive;
+                    Serial.print("Voice ");
+                    Serial.print(voiceIndex + 1);
+                    Serial.print(" overdrive ");
+                    Serial.println(config->hasOverdrive ? "ON" : "OFF");
+                    break;
+      
+                  case 11: // Toggle hasWavefolder
+                    config->hasWavefolder = !config->hasWavefolder;
+                    Serial.print("Voice ");
+                    Serial.print(voiceIndex + 1);
+                    Serial.print(" wavefolder ");
+                    Serial.println(config->hasWavefolder ? "ON" : "OFF");
+                    break;
+      
+                  case 12: // Cycle through filterMode
+                    {
+                      int currentMode = static_cast<int>(config->filterMode);
+                      currentMode = (currentMode + 1) % 5; // Cycle through 5 filter modes
+                      config->filterMode = static_cast<daisysp::LadderFilter::FilterMode>(currentMode);
+      
+                      const char* filterNames[] = {"LP12", "LP24", "LP36", "BP12", "BP24"};
+                      Serial.print("Voice ");
+                      Serial.print(voiceIndex + 1);
+                      Serial.print(" filter mode: ");
+                      Serial.println(filterNames[currentMode]);
+                    }
+                    break;
+                  case 13: // Cycle through filter resonance amounts
+                    {
+                      float currentResonance = config->filterRes;
+                      currentResonance += 0.1f;
+                      if (currentResonance > 1.0f) currentResonance = 0.0f;
+                      config->filterRes = currentResonance;
+      
+                      Serial.print("Voice ");
+                      Serial.print(voiceIndex + 1);
+                      Serial.print(" filter resonance: ");
+                      Serial.println(currentResonance, 2);
+                    }
+                    break;
+                  case 14:
+                    config->hasDalek = !config->hasDalek;
+                    Serial.print("Voice ");
+                    Serial.print(voiceIndex + 1);
+                    Serial.print(" dalek ");
+                    Serial.println(config->hasDalek ? "ON" : "OFF");
+                    break;
+      
+                  default:
+                    // Buttons 15-24 reserved for future voice parameters
+                    Serial.print("Voice parameter button ");
+                    Serial.print(evt.buttonIndex);
+                    Serial.println(" - not yet implemented");
+                    break;
+                }
+      
+                // Apply the updated configuration to the voice
+                voiceManager->setVoiceConfig(currentVoiceId, *config);
               }
-              break;
-            case 13: // Cycle through filter resonance amounts
-              {
-                float currentResonance = config->filterRes;
-                currentResonance += 0.1f;
-                if (currentResonance > 1.0f) currentResonance = 0.0f;
-                config->filterRes = currentResonance;
-                
-                Serial.print("Voice ");
-                Serial.print(uiState.isVoice2Mode ? "2" : "1");
-                Serial.print(" filter resonance: ");
-                Serial.println(currentResonance, 2);
-              }
-              break;
-              case 14:
-               config->hasDalek = !config->hasDalek;
-               Serial.print("Voice ");
-               Serial.print(uiState.isVoice2Mode ? "2" : "1");
-               Serial.print(" dalek ");
-               Serial.println(config->hasDalek ? "ON" : "OFF");
-               break;
-
-
-              
-            default:
-              // Buttons 13-24 reserved for future voice parameters
-              Serial.print("Voice parameter button ");
-              Serial.print(evt.buttonIndex);
-              Serial.println(" - not yet implemented");
-              break;
-          }
-          
-          // Apply the updated configuration to the voice
-          voiceManager->setVoiceConfig(currentVoiceId, *config);
-        }
-      }
+            }
       // When in main settings menu, handle voice selection
       else if (evt.buttonIndex < 2) { // Only Voice 1 and Voice 2 options available
         // Store selected voice and enter preset selection mode

@@ -803,7 +803,7 @@ if ((currentMillis - lastControlUpdate >= CONTROL_UPDATE_INTERVAL)){
     if (currentMillis - lastLEDUpdate >= LED_UPDATE_INTERVAL) {
      lastLEDUpdate = currentMillis;
         updateStepLEDs(ledMatrix, seq1, seq2, uiState, mm);
-        display.update(uiState, seq1, seq2);
+        display.update(uiState, seq1, seq2, voiceManager.get());
 
         updateControlLEDs(ledMatrix, uiState);  
         ledMatrix.show();

@@ -42,6 +42,15 @@ public:
     void update(const UIState& uiState, const Sequencer& seq1, const Sequencer& seq2);
     
     /**
+     * @brief Update the display with voice manager access for settings mode
+     * @param uiState Current UI state containing button states
+     * @param seq1 Sequencer 1 reference for parameter values
+     * @param seq2 Sequencer 2 reference for parameter values
+     * @param voiceManager Pointer to voice manager for accessing voice configs
+     */
+    void update(const UIState& uiState, const Sequencer& seq1, const Sequencer& seq2, class VoiceManager* voiceManager);
+    
+    /**
      * @brief Clear the display
      */
     void clear();
@@ -89,6 +98,13 @@ private:
      */
     void displayVoiceParameterInfo(const UIState& uiState, class VoiceManager* voiceManager, 
                                   uint8_t leadVoiceId, uint8_t bassVoiceId);
+    
+    /**
+     * @brief Display voice parameter toggles in settings mode
+     * @param uiState Current UI state
+     * @param voiceManager Pointer to voice manager for accessing voice configs
+     */
+    void displayVoiceParameterToggles(const UIState& uiState, class VoiceManager* voiceManager);
 
 };
 
