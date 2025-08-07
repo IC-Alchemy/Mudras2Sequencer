@@ -800,8 +800,8 @@ void loop1()
     static unsigned long lastLEDUpdate = 0;
     static unsigned long lastControlUpdate = 0;
     
-    const unsigned long LED_UPDATE_INTERVAL = 40; // 30ms interval
-    const unsigned long CONTROL_UPDATE_INTERVAL = 1; // 2ms interval
+    const unsigned long LED_UPDATE_INTERVAL = 10; // 30ms interval
+    const unsigned long CONTROL_UPDATE_INTERVAL = 2; // 2ms interval
     uint16_t currtouched = touchSensor.touched();
     
 if ((currentMillis - lastControlUpdate >= CONTROL_UPDATE_INTERVAL)){  
@@ -826,10 +826,7 @@ if ((currentMillis - lastControlUpdate >= CONTROL_UPDATE_INTERVAL)){
     {
         mm = 0; // Invalid reading
     }
- if (uiState.selectedStepForEdit != -1)
-        {
-            updateParametersForStep(uiState.selectedStepForEdit);
-        }
+
 
 }
     // Check for voice switch trigger and handle immediate OLED update
@@ -848,6 +845,9 @@ if ((currentMillis - lastControlUpdate >= CONTROL_UPDATE_INTERVAL)){
         updateControlLEDs(ledMatrix, uiState);  
         ledMatrix.show();
     }
-       
+        if (uiState.selectedStepForEdit != -1)
+        {
+            updateParametersForStep(uiState.selectedStepForEdit);
+        }
     }
 

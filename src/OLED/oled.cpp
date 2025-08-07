@@ -164,7 +164,7 @@ void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Se
     // Priority-based display logic to prevent menu conflicts
 
     // 1. HIGHEST PRIORITY: AS5600 parameter display (when parameter is selected or value changed)
-    if (uiState.inAS5600ParameterMode && (millis() - uiState.as5600ParameterChangeTime < 3000)) {
+    if (uiState.inAS5600ParameterMode && (millis() - uiState.as5600ParameterChangeTime < 6000)) {
         const char* paramName = getAS5600ParameterName(uiState.currentAS5600Parameter);
 
         // Get the actual current parameter value
