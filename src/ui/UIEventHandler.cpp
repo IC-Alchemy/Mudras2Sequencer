@@ -226,14 +226,14 @@ static bool handleParameterButtonEvent(const MatrixButtonEvent &evt,
     if (evt.buttonIndex == mapping.buttonIndex) {
       bool pressed = (evt.type == MATRIX_BUTTON_PRESSED);
       uiState.parameterButtonHeld[static_cast<int>(mapping.paramId)] = pressed;
-
+/*
       Serial.print("Button ");
       Serial.print(mapping.buttonIndex);
       Serial.print(" (");
       Serial.print(mapping.name);
       Serial.print(") ");
       Serial.println(pressed ? "pressed" : "released");
-
+*/
       // Automatically select AS5600 parameter if not the Note parameter and
       // button is pressed
       if (pressed && mapping.paramId != ParamId::Note) {
@@ -247,16 +247,20 @@ static bool handleParameterButtonEvent(const MatrixButtonEvent &evt,
         if (uiState.currentEditParameter == mapping.paramId) {
           // Toggle off - stop editing this parameter
           uiState.currentEditParameter = ParamId::Count;
-          Serial.print("Edit mode: Stopped editing ");
-          Serial.println(mapping.name);
+         // Serial.print("Edit mode: Stopped editing ");
+         // Serial.println(mapping.name);
         } else {
           // Toggle on - start editing this parameter
           uiState.currentEditParameter = mapping.paramId;
           autoSelectAS5600Parameter(mapping.paramId, uiState);
+
+          /*
           Serial.print("Edit mode: Started editing ");
           Serial.print(mapping.name);
           Serial.print(" for step ");
           Serial.println(uiState.selectedStepForEdit);
+
+          */
         }
       }
       return true;
@@ -284,14 +288,14 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
           // Voice 1 preset selection
           uiState.voice1PresetIndex = evt.buttonIndex;
           applyVoicePreset(1, evt.buttonIndex);
-          Serial.print("Voice 1 preset set to: ");
-          Serial.println(VoicePresets::getPresetName(evt.buttonIndex));
+        //  Serial.print("Voice 1 preset set to: ");
+         // Serial.println(VoicePresets::getPresetName(evt.buttonIndex));
         } else if (uiState.settingsMenuIndex == 1) {
           // Voice 2 preset selection  
           uiState.voice2PresetIndex = evt.buttonIndex;
           applyVoicePreset(2, evt.buttonIndex);
-          Serial.print("Voice 2 preset set to: ");
-          Serial.println(VoicePresets::getPresetName(evt.buttonIndex));
+         // Serial.print("Voice 2 preset set to: ");
+          //Serial.println(VoicePresets::getPresetName(evt.buttonIndex));
         }
         // Exit preset selection mode after applying preset
         uiState.inPresetSelection = false;
@@ -313,7 +317,7 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
                 uint8_t displayVoiceNumber = uiState.isVoice2Mode ? 2 : 1;
 
                 switch (evt.buttonIndex) {
-                  case 9: // Toggle hasEnvelope per voice
+                  case 8: // Toggle hasEnvelope per voice
                     config->hasEnvelope = !config->hasEnvelope;
                     Serial.print("Voice ");
                     Serial.print(displayVoiceNumber);
@@ -321,7 +325,7 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
                     Serial.println(config->hasEnvelope ? "ON" : "OFF");
                     break;
 
-                  case 10: // Toggle hasOverdrive
+                  case 9: // Toggle hasOverdrive
                     config->hasOverdrive = !config->hasOverdrive;
                     Serial.print("Voice ");
                     Serial.print(displayVoiceNumber);
@@ -329,7 +333,7 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
                     Serial.println(config->hasOverdrive ? "ON" : "OFF");
                     break;
 
-                  case 11: // Toggle hasWavefolder
+                  case 10: // Toggle hasWavefolder
                     config->hasWavefolder = !config->hasWavefolder;
                     Serial.print("Voice ");
                     Serial.print(displayVoiceNumber);
@@ -337,7 +341,7 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
                     Serial.println(config->hasWavefolder ? "ON" : "OFF");
                     break;
       
-                  case 12: // Cycle through filterMode
+                  case 11: // Cycle through filterMode
                     {
                       int currentMode = static_cast<int>(config->filterMode);
                       currentMode = (currentMode + 1) % 5; // Cycle through 5 filter modes
@@ -350,7 +354,7 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
                       Serial.println(filterNames[currentMode]);
                     }
                     break;
-                  case 13: // Cycle through filter resonance amounts
+                  case 12: // Cycle through filter resonance amounts
                     {
                       float currentResonance = config->filterRes;
                       currentResonance += 0.1f;
@@ -363,7 +367,7 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
                       Serial.println(currentResonance, 2);
                     }
                     break;
-                  case 14:
+                  case 13:
                     config->hasDalek = !config->hasDalek;
                     Serial.print("Voice ");
                     Serial.print(displayVoiceNumber);
@@ -388,8 +392,8 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
         // Store selected voice and enter preset selection mode
         uiState.settingsMenuIndex = evt.buttonIndex;
         uiState.inPresetSelection = true;
-        Serial.print("Entered preset selection for Voice ");
-        Serial.println(evt.buttonIndex + 1);
+      //  Serial.print("Entered preset selection for Voice ");
+      //  Serial.println(evt.buttonIndex + 1);
       }
     }
     return true; // Event was handled
@@ -405,10 +409,10 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
       uint8_t newStepCount = evt.buttonIndex + 1;
       currentActiveSeq.setParameterStepCount(heldMapping->paramId,
                                              newStepCount);
-      Serial.print("Set ");
-      Serial.print(heldMapping->name);
-      Serial.print(" parameter length to ");
-      Serial.println(newStepCount);
+   //   Serial.print("Set ");
+    //  Serial.print(heldMapping->name);
+    //  Serial.print(" parameter length to ");
+     // Serial.println(newStepCount);
     }
     return true;
   }
@@ -454,8 +458,8 @@ static void handleControlButtonEvent(uint8_t buttonIndex, UIState &uiState,
     uiState.selectedStepForEdit = -1;
     uiState.currentEditParameter =
         ParamId::Count; // Clear edit parameter when exiting edit mode
-    Serial.print("Slide mode ");
-    Serial.println(uiState.slideMode ? "ON" : "OFF");
+    //Serial.print("Slide mode ");
+    //Serial.println(uiState.slideMode ? "ON" : "OFF");
     break;
   case BUTTON_AS5600_CONTROL:
     handleAS5600ParameterControl(uiState);
@@ -471,7 +475,7 @@ static void handleControlButtonEvent(uint8_t buttonIndex, UIState &uiState,
       if (uiState.settingsMode) {
         uiState.settingsMode = false;
         uiState.inPresetSelection = false;
-        Serial.println("Exited settings mode");
+       // Serial.println("Exited settings mode");
       }
       uiState.flash25Until = millis() + CONTROL_LED_FLASH_DURATION_MS;
     }
@@ -502,10 +506,10 @@ static void handleControlButtonEvent(uint8_t buttonIndex, UIState &uiState,
       uClock.setShuffle(uiState.currentShufflePatternIndex >
                         0); // Enable shuffle if not "No Shuffle"
 
-      Serial.print("Shuffle pattern changed to index ");
-      Serial.print(uiState.currentShufflePatternIndex);
-      Serial.print(": ");
-      Serial.println(currentTemplate.name);
+  //    Serial.print("Shuffle pattern changed to index ");
+   //   Serial.print(uiState.currentShufflePatternIndex);
+    //  Serial.print(": ");
+    //  Serial.println(currentTemplate.name);
     }
     break;
 
@@ -514,9 +518,9 @@ static void handleControlButtonEvent(uint8_t buttonIndex, UIState &uiState,
     uiState.flash23Until = millis() + CONTROL_LED_FLASH_DURATION_MS;
     if (uiState.delayOn) {
       uiState.currentAS5600Parameter = AS5600ParameterMode::DelayTime;
-      Serial.println("Delay ON - AS5600 set to Delay Time");
+  //    Serial.println("Delay ON - AS5600 set to Delay Time");
     } else {
-      Serial.println("Delay OFF");
+    //  Serial.println("Delay OFF");
     }
     break;
   }
@@ -548,6 +552,12 @@ static void autoSelectAS5600Parameter(ParamId paramId, UIState &uiState) {
 
   if (isValid && newAS5600Param != uiState.currentAS5600Parameter) {
     uiState.currentAS5600Parameter = newAS5600Param;
+    
+    // Trigger OLED display for AS5600 parameter selection
+    uiState.inAS5600ParameterMode = true;
+    uiState.as5600ParameterChangeTime = millis();
+    uiState.as5600ParameterValueChanged = false; // Just parameter selection, not value change
+    
     Serial.print("AS5600 auto-selected: ");
     Serial.println(CORE_PARAMETERS[static_cast<int>(paramId)].name);
   }
@@ -559,6 +569,11 @@ static void handleAS5600ParameterControl(UIState &uiState) {
       static_cast<uint8_t>(AS5600ParameterMode::COUNT));
 
   uiState.lastAS5600ButtonPress = millis();
+  
+  // Trigger OLED display for AS5600 parameter selection
+  uiState.inAS5600ParameterMode = true;
+  uiState.as5600ParameterChangeTime = millis();
+  uiState.as5600ParameterValueChanged = false; // Just parameter selection, not value change
 
   Serial.print("AS5600 parameter switched to: ");
   switch (uiState.currentAS5600Parameter) {

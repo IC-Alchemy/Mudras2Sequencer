@@ -5,6 +5,8 @@
 #include "../sequencer/ShuffleTemplates.h"
 #include "../scales/scales.h"
 #include "../ui/ButtonManager.h"
+#include "../sensors/AS5600Manager.h"  // For getAS5600ParameterValue function
+#include <cstring>  // For strlen and strcmp
 
 // Constructor implementation
 OLEDDisplay::OLEDDisplay() : display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET), initialized(false) {
@@ -65,8 +67,8 @@ void OLEDDisplay::displayVoiceParameterToggles(const UIState& uiState, VoiceMana
     extern uint8_t bassVoiceId;
 
     // Compact parameter display for 2 voices
-    const char* paramNames[] = {"E", "O", "W", "F", "R", "D"}; // Single letters
-    const int paramButtons[] = {9, 10, 11, 12, 13, 14};
+    const char* paramNames[] = {"E", "O", "W", "F", "R", "D"}; // Single letters: Envelope, Overdrive, Wavefolder, Filter, Resonance, Dalek
+    const int paramButtons[] = {9, 10, 11, 12, 13, 14}; // Buttons 9-14 for voice parameters
     const int numParams = 6;
 
     // Voice IDs to display
@@ -95,35 +97,40 @@ void OLEDDisplay::displayVoiceParameterToggles(const UIState& uiState, VoiceMana
         
         // Parameter states in compact format
         for (int i = 0; i < numParams; i++) {
-            int xPos = 5 + (i * 22); // Tighter spacing
+            int xPos = 11 + (i * 16); // Spacing to align with labels
             display.setCursor(xPos, yStart);
-            
-            // Get parameter state
+
+            // Get parameter state based on button mapping
             bool paramState = false;
             switch (paramButtons[i]) {
-                case 9: paramState = config->hasEnvelope; break;
-                case 10: paramState = config->hasOverdrive; break;
-                case 11: paramState = config->hasWavefolder; break;
-                case 12: 
-                    // Show filter mode as number (0-4)
+                case 9: // Envelope (E)
+                    paramState = config->hasEnvelope;
+                    display.print(paramState ? "1" : "0");
+                    break;
+                case 10: // Overdrive (O)
+                    paramState = config->hasOverdrive;
+                    display.print(paramState ? "1" : "0");
+                    break;
+                case 11: // Wavefolder (W)
+                    paramState = config->hasWavefolder;
+                    display.print(paramState ? "1" : "0");
+                    break;
+                case 12: // Filter mode (F)
                     display.print(static_cast<int>(config->filterMode));
-                    continue;
-                case 13:
-                    // Show resonance as 2-digit percentage
+                    break;
+                case 13: // Resonance (R)
                     display.print((int)(config->filterRes * 100));
-                    continue;
-                case 14: paramState = config->hasDalek; break;
-            }
-            
-            // Display compact ON/OFF state
-            if (paramButtons[i] != 12 && paramButtons[i] != 13) {
-                display.print(paramState ? "1" : "0"); // Use 1/0 instead of ON/OFF
+                    break;
+                case 14: // Dalek/Ring Modulation (D)
+                    paramState = config->hasDalek;
+                    display.print(paramState ? "1" : "0");
+                    break;
             }
         }
         
         // Parameter labels on second line (single letters)
         for (int i = 0; i < numParams; i++) {
-            int xPos = 5 + (i * 22);
+            int xPos = 11 + (i * 16);
             display.setCursor(xPos, yStart + 8);
             display.print(paramNames[i]);
         }
@@ -156,7 +163,53 @@ void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Se
 
     // Priority-based display logic to prevent menu conflicts
 
-    // 1. HIGHEST PRIORITY: Voice parameter editing mode (when in settings and recently changed parameters)
+    // 1. HIGHEST PRIORITY: AS5600 parameter display (when parameter is selected or value changed)
+    if (uiState.inAS5600ParameterMode && (millis() - uiState.as5600ParameterChangeTime < 3000)) {
+        const char* paramName = getAS5600ParameterName(uiState.currentAS5600Parameter);
+
+        // Get the actual current parameter value
+        float currentValue = getAS5600ParameterValue();
+
+        // GATE-CONTROLLED DISPLAY: Only show parameter values when gate is HIGH
+        bool shouldShowValue = uiState.as5600ParameterValueChanged;
+        if (shouldShowValue) {
+            // For AS5600 parameters that correspond to sequencer parameters, check gate state
+            if (uiState.currentAS5600Parameter <= AS5600ParameterMode::Decay) {
+                // Get the current sequencer and determine which step to check
+                const Sequencer& currentSeq = uiState.isVoice2Mode ? seq2 : seq1;
+
+                // Convert AS5600 parameter to ParamId to get the current step
+                ParamId correspondingParam = ParamId::Count;
+                switch (uiState.currentAS5600Parameter) {
+                    case AS5600ParameterMode::Note:     correspondingParam = ParamId::Note; break;
+                    case AS5600ParameterMode::Velocity: correspondingParam = ParamId::Velocity; break;
+                    case AS5600ParameterMode::Filter:   correspondingParam = ParamId::Filter; break;
+                    case AS5600ParameterMode::Attack:   correspondingParam = ParamId::Attack; break;
+                    case AS5600ParameterMode::Decay:    correspondingParam = ParamId::Decay; break;
+                    default: break;
+                }
+
+                if (correspondingParam != ParamId::Count) {
+                    uint8_t currentStep = currentSeq.getCurrentStepForParameter(correspondingParam);
+                    float gateValue = currentSeq.getStepParameterValue(ParamId::Gate, currentStep);
+
+                    // Only show value if gate is HIGH (> 0.5f)
+                    shouldShowValue = (gateValue > 0.5f);
+                }
+            }
+            // DelayTime, DelayFeedback, and SlideTime are global parameters - always show their values
+        }
+
+        displayAS5600ParameterInfo(uiState, paramName, currentValue, shouldShowValue);
+        display.display();
+        return;
+    } else if (uiState.inAS5600ParameterMode) {
+        // Clear AS5600 parameter mode after timeout
+        const_cast<UIState&>(uiState).inAS5600ParameterMode = false;
+        const_cast<UIState&>(uiState).as5600ParameterValueChanged = false;
+    }
+
+    // 2. HIGH PRIORITY: Voice parameter editing mode (when in settings and recently changed parameters)
     if (uiState.settingsMode && voiceManager && uiState.inVoiceParameterMode &&
         (millis() - uiState.voiceParameterChangeTime < 5000)) {
         displayVoiceParameterToggles(uiState, voiceManager);
@@ -164,14 +217,14 @@ void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Se
         return;
     }
 
-    // 2. MEDIUM PRIORITY: Settings mode (main settings menu or preset selection)
+    // 3. MEDIUM PRIORITY: Settings mode (main settings menu or preset selection)
     if (uiState.settingsMode) {
         displaySettingsMenu(uiState);
         display.display();
         return;
     }
 
-    // 3. LOW PRIORITY: Voice parameter info display (outside of settings mode)
+    // 4. LOW PRIORITY: Voice parameter info display (outside of settings mode)
     if (uiState.inVoiceParameterMode && (millis() - uiState.voiceParameterChangeTime < 3000)) {
         // Show voice parameter info for 3 seconds after change
         display.setCursor(5, 5);
@@ -193,7 +246,7 @@ void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Se
     const ParamButtonMapping* heldParam = getHeldParameterButton(uiState);
 
     if (heldParam != nullptr) {
-        // Display parameter editing information
+        // Display parameter editing information - ALWAYS show parameter values regardless of gate state
         uint8_t voice = uiState.isVoice2Mode ? 2 : 1;
         const Sequencer& currentSeq = uiState.isVoice2Mode ? seq2 : seq1;
         uint8_t currentStep = currentSeq.getCurrentStepForParameter(heldParam->paramId);
@@ -202,11 +255,10 @@ void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Se
     } else if (uiState.selectedStepForEdit != -1) {
         // Step editing mode - show step parameter values
         if (uiState.currentEditParameter != ParamId::Count) {
-            // Display the currently editing parameter for the selected step
+            // Display the currently editing parameter for the selected step - ALWAYS show regardless of gate state
             uint8_t voice = uiState.isVoice2Mode ? 2 : 1;
             const Sequencer& currentSeq = uiState.isVoice2Mode ? seq2 : seq1;
-            float currentValue = currentSeq.getStepParameterValue(uiState.currentEditParameter, uiState.selectedStepForEdit);
-            
+
             // Find parameter name
             const char* paramName = "Unknown";
             for (size_t i = 0; i < PARAM_BUTTON_MAPPINGS_SIZE; ++i) {
@@ -215,7 +267,9 @@ void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Se
                     break;
                 }
             }
-            
+
+            // Always display parameter values regardless of gate state
+            float currentValue = currentSeq.getStepParameterValue(uiState.currentEditParameter, uiState.selectedStepForEdit);
             displayParameterInfo(paramName, currentValue, voice, uiState.selectedStepForEdit);
         } else {
             // No parameter selected - show step selection prompt
@@ -300,10 +354,10 @@ void OLEDDisplay::displayParameterInfo(const char* paramName, float currentValue
     // Parameter value
     display.setTextSize(2);
     display.setCursor(5, 32);
-    
+
     // Format the parameter value based on its type
     ParamId paramId = ParamId::Note; // Default
-    
+
     // Find the ParamId based on the parameter name
     for (size_t i = 0; i < PARAM_BUTTON_MAPPINGS_SIZE; ++i) {
         if (strcmp(PARAM_BUTTON_MAPPINGS[i].name, paramName) == 0) {
@@ -311,23 +365,23 @@ void OLEDDisplay::displayParameterInfo(const char* paramName, float currentValue
             break;
         }
     }
-    
+
     String formattedValue = formatParameterValue(paramId, currentValue);
     display.print(formattedValue);
-    
+
     // Progress bar for normalized parameters
-    if (paramId != ParamId::Note && paramId != ParamId::Octave && 
+    if (paramId != ParamId::Note && paramId != ParamId::Octave &&
         paramId != ParamId::Gate && paramId != ParamId::Slide) {
-        
+
         // Draw progress bar
         int barWidth = SCREEN_WIDTH - 10;
         int barHeight = 10;
         int barX = 5;
         int barY = 52;
-        
+
         // Background
         display.drawRect(barX, barY, barWidth, barHeight, SH110X_WHITE);
-        
+
         // Fill based on parameter value (0.0 to 1.0)
         int fillWidth = (int)(currentValue * (barWidth - 4));
         if (fillWidth > 0) {
@@ -335,6 +389,8 @@ void OLEDDisplay::displayParameterInfo(const char* paramName, float currentValue
         }
     }
 }
+
+
 
 String OLEDDisplay::formatParameterValue(ParamId paramId, float value) {
     switch (paramId) {
@@ -372,6 +428,63 @@ String OLEDDisplay::formatParameterValue(ParamId paramId, float value) {
             
         default:
             return String(value, 2);
+    }
+}
+
+String OLEDDisplay::formatAS5600ParameterValue(AS5600ParameterMode paramMode, float value) {
+    switch (paramMode) {
+        case AS5600ParameterMode::Note:
+            return String((int)value);
+            
+        case AS5600ParameterMode::Velocity:
+            return String((int)(value * 100)) + "%";
+            
+        case AS5600ParameterMode::Filter:
+        {
+            int filterFreq = (int)(value * 6710.0f + 100.0f); // Simple linear mapping for display
+            return String(filterFreq) + "Hz";
+        }
+            
+        case AS5600ParameterMode::Attack:
+            return String(value, 3) + "s";
+            
+        case AS5600ParameterMode::Decay:
+            return String(value, 3) + "s";
+            
+        case AS5600ParameterMode::DelayTime:
+            return String(value / 1024.0f, 2) + "s"; // Convert samples to seconds
+            
+        case AS5600ParameterMode::DelayFeedback:
+            return String((int)(value * 100)) + "%";
+            
+        case AS5600ParameterMode::SlideTime:
+            return String(value, 3) + "s";
+            
+        default:
+            return String(value, 2);
+    }
+}
+
+const char* OLEDDisplay::getAS5600ParameterName(AS5600ParameterMode paramMode) {
+    switch (paramMode) {
+        case AS5600ParameterMode::Note:
+            return "Note";
+        case AS5600ParameterMode::Velocity:
+            return "Velocity";
+        case AS5600ParameterMode::Filter:
+            return "Filter";
+        case AS5600ParameterMode::Attack:
+            return "Attack";
+        case AS5600ParameterMode::Decay:
+            return "Decay";
+        case AS5600ParameterMode::DelayTime:
+            return "Delay Time";
+        case AS5600ParameterMode::DelayFeedback:
+            return "Delay FB";
+        case AS5600ParameterMode::SlideTime:
+            return "Slide Time";
+        default:
+            return "Unknown";
     }
 }
 
@@ -436,7 +549,7 @@ void OLEDDisplay::displaySettingsMenu(const UIState& uiState) {
         display.print("SETTINGS MENU");
         
         // Draw separator line
-        display.drawFastHLine(5, 14, SCREEN_WIDTH - 10, SH110X_WHITE);
+      //  display.drawFastHLine(5, 14, SCREEN_WIDTH - 10, SH110X_WHITE);
         
         // Voice configurations with better visual hierarchy
         for (int i = 0; i < 2; i++) {
@@ -458,7 +571,8 @@ void OLEDDisplay::displaySettingsMenu(const UIState& uiState) {
             display.print(i + 1);
             
             // Current preset name
-            display.setCursor(5, yPos + 8);
+            display.setCursor(5, yPos + 10);
+
             const char* presetName = (i == 0) ? 
                 VoicePresets::getPresetName(uiState.voice1PresetIndex) :
                 VoicePresets::getPresetName(uiState.voice2PresetIndex);
@@ -466,9 +580,7 @@ void OLEDDisplay::displaySettingsMenu(const UIState& uiState) {
             display.print(presetName);
         }
         
-        // Instructions at bottom
-        display.setCursor(5, 56);
-        display.print("B 1-2:SEL  B 8:EDIT  B 9-24:PARAMS");
+    
     }
 }
 
@@ -506,19 +618,19 @@ void OLEDDisplay::displayVoiceParameterInfo(const UIState& uiState, VoiceManager
     String paramValue = "";
     
     switch (uiState.lastVoiceParameterButton) {
-        case 9:
+        case 8:
             paramName = "Envelope";
             paramValue = config->hasEnvelope ? "ON" : "OFF";
             break;
-        case 10:
+        case 9:
             paramName = "Overdrive";
             paramValue = config->hasOverdrive ? "ON" : "OFF";
             break;
-        case 11:
+        case 10:
             paramName = "Wavefolder";
             paramValue = config->hasWavefolder ? "ON" : "OFF";
             break;
-        case 12:
+        case 11:
             {
                 paramName = "Filter Mode";
                 const char* filterNames[] = {"LP12", "LP24", "LP36", "BP12", "BP24"};
@@ -530,7 +642,7 @@ void OLEDDisplay::displayVoiceParameterInfo(const UIState& uiState, VoiceManager
                 }
             }
             break;
-        case 13:
+        case 12:
             paramName = "Filter Res";
             paramValue = String(config->filterRes, 2);
             break;
@@ -556,6 +668,123 @@ void OLEDDisplay::displayVoiceParameterInfo(const UIState& uiState, VoiceManager
     display.setCursor(5, 55);
     display.print("Button ");
     display.print(uiState.lastVoiceParameterButton);
+    
+    display.display();
+}
+
+void OLEDDisplay::displayAS5600ParameterInfo(const UIState& uiState, const char* parameterName,
+                                           float currentValue, bool showValue) {
+    if (!initialized) return;
+
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(SH110X_WHITE);
+
+    // Draw border for professional look
+    display.drawRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, SH110X_WHITE);
+
+    // Header
+    display.setCursor(5, 5);
+    display.setTextSize(1);
+    display.print("AS5600 PARAMETER");
+
+    // Voice indicator
+    display.setCursor(100, 5);
+    display.print("V");
+    display.print(uiState.isVoice2Mode ? "2" : "1");
+
+    // Show current step for sequencer parameters
+    if (uiState.currentAS5600Parameter <= AS5600ParameterMode::Decay) {
+        extern Sequencer seq1, seq2;
+        const Sequencer& currentSeq = uiState.isVoice2Mode ? seq2 : seq1;
+
+        ParamId correspondingParam = ParamId::Count;
+        switch (uiState.currentAS5600Parameter) {
+            case AS5600ParameterMode::Note:     correspondingParam = ParamId::Note; break;
+            case AS5600ParameterMode::Velocity: correspondingParam = ParamId::Velocity; break;
+            case AS5600ParameterMode::Filter:   correspondingParam = ParamId::Filter; break;
+            case AS5600ParameterMode::Attack:   correspondingParam = ParamId::Attack; break;
+            case AS5600ParameterMode::Decay:    correspondingParam = ParamId::Decay; break;
+            default: break;
+        }
+
+        if (correspondingParam != ParamId::Count) {
+            uint8_t currentStep = currentSeq.getCurrentStepForParameter(correspondingParam);
+            display.setCursor(100, 15);
+            display.print("S");
+            display.print(currentStep + 1);
+        }
+    }
+
+    // Draw separator line
+    display.drawFastHLine(5, 24, SCREEN_WIDTH - 10, SH110X_WHITE);
+
+    // Parameter name - large and centered
+    display.setTextSize(2);
+    const char* displayName = parameterName;
+    int textWidth = strlen(displayName) * 12; // Approximate width for size 2
+    int centerX = (SCREEN_WIDTH - textWidth) / 2;
+    display.setCursor(centerX, 30);
+    display.print(displayName);
+    
+    if (showValue) {
+        // Parameter value
+        display.setTextSize(1);
+        display.setCursor(5, 42);
+        display.print("Value: ");
+        
+        // Format value based on parameter type
+        AS5600ParameterMode currentParam = uiState.currentAS5600Parameter;
+        String formattedValue = formatAS5600ParameterValue(currentParam, currentValue);
+        
+        display.setTextSize(1);
+        display.setCursor(45, 42);
+        display.print(formattedValue);
+        
+        // Progress bar for normalized parameters (except Note)
+        if (currentParam != AS5600ParameterMode::Note) {
+            int barWidth = SCREEN_WIDTH - 10;
+            int barHeight = 8;
+            int barX = 5;
+            int barY = 52;
+            
+            // Background
+            display.drawRect(barX, barY, barWidth, barHeight, SH110X_WHITE);
+            
+            // Normalize value for progress bar (0.0 to 1.0)
+            float normalizedValue = currentValue;
+            if (currentParam == AS5600ParameterMode::DelayTime) {
+                normalizedValue = currentValue / (85.0f * 1024.0f); // Normalize delay time
+            } else if (currentParam == AS5600ParameterMode::DelayFeedback) {
+                normalizedValue = currentValue / 0.91f; // Normalize feedback
+            } else if (currentParam == AS5600ParameterMode::SlideTime) {
+                normalizedValue = currentValue / 2.0f; // Normalize slide time
+            }
+            
+            // Clamp to 0-1 range
+            normalizedValue = constrain(normalizedValue, 0.0f, 1.0f);
+            
+            // Fill based on normalized value
+            int fillWidth = (int)(normalizedValue * (barWidth - 4));
+            if (fillWidth > 0) {
+                display.fillRect(barX + 2, barY + 2, fillWidth, barHeight - 4, SH110X_WHITE);
+            }
+        }
+    } else {
+        // Show appropriate message based on why value is not displayed
+        display.setTextSize(1);
+        if (uiState.as5600ParameterValueChanged) {
+            // Value changed but gate is LOW - explain why value is not shown
+            display.setCursor(5, 48);
+            display.print("Gate LOW - Value");
+            display.setCursor(5, 56);
+            display.print("not displayed");
+        } else {
+            // Just parameter selection
+            display.setCursor(5, 48);
+            display.print("Parameter Selected");
+        }
+    }
     
     display.display();
 }

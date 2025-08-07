@@ -2,20 +2,26 @@
 
 ## Button Layout (32 Buttons Total)
 
-### Step Buttons (0-15) - 4x4 LED Matrix Grid
+### Step Buttons (0-31) - 4x8 LED Matrix Grid
 ```
-┌─────┬─────┬─────┬─────┐  Voice 1: Rows 0-1 (Green)
-│  0  │  1  │  2  │  3  │  Voice 2: Rows 2-3 (Cyan)
-├─────┼─────┼─────┼─────┤
-│  4  │  5  │  6  │  7  │  • Short Press: Toggle gate on/off
-├─────┼─────┼─────┼─────┤  • Long Press: Select for editing
-│  8  │  9  │ 10  │ 11  │  • With Param Button: Set length
-├─────┼─────┼─────┼─────┤  • In Slide Mode: Toggle slide
-│ 12  │ 13  │ 14  │ 15  │  • In Settings: Navigate menus
-└─────┴─────┴─────┴─────┘
+┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┐
+│  0  │  1  │  2  │  3  │  4  │  5  │  6  │  7  │  Row 0
+├─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┤
+│  8  │  9  │ 10  │ 11  │ 12  │ 13  │ 14  │ 15  │  Row 1
+├─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┤
+│ 16  │ 17  │ 18  │ 19  │ 20  │ 21  │ 22  │ 23  │  Row 2
+├─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┤
+│ 24  │ 25  │ 26  │ 27  │ 28  │ 29  │ 30  │ 31  │  Row 3
+└─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┘
+
+• Short Press: Toggle gate on/off
+• Long Press: Select for editing  
+• With Param Button: Set length
+• In Slide Mode: Toggle slide
+• In Settings: Navigate menus
 ```
 
-### Parameter Buttons (16-21)
+### Parameter Buttons (16-22)
 | Button | Parameter | Range | Function |
 |--------|-----------|-------|----------|
 | **16** | Note | 0-21 | Scale degree selection |
@@ -24,13 +30,13 @@
 | **19** | Attack | 0.0-1.0s | Envelope attack time |
 | **20** | Decay | 0.0-1.0s | Envelope decay time |
 | **21** | Octave | -1,0,+1 | Octave transposition |
+| **22** | Slide | 0/1 | Slide/legato enable |
 
 **Usage:** Hold + Distance Sensor = Record values • Hold + Step = Set length
 
-### Control Buttons (22-31)
+### Control Buttons (23-31)
 | Button | Function | Short Press | Long Press |
 |--------|----------|-------------|------------|
-| **22** | Slide Mode | Enter/exit slide mode | - |
 | **23** | Delay | Toggle delay on/off | - |
 | **24** | Voice Switch | Voice 1 ↔ Voice 2 | (Reserved) |
 | **25** | AS5600 Control | Cycle parameter modes | - |
@@ -49,11 +55,11 @@
 - **AS5600:** Control selected parameter
 - **LED:** Shows gate states and playhead
 
-### 🎼 Slide Mode (Button 22)
-- **Entry:** Press button 22
+### 🎼 Slide Mode (Parameter Button 22)
+- **Entry:** Hold parameter button 22 (Slide)
 - **Step buttons:** Toggle slide on/off per step
 - **LED:** Shows slide states overlaid on gates
-- **Exit:** Press button 22 again
+- **Exit:** Release parameter button 22
 
 ### ⚙️ Settings Mode (Long press Play/Stop when stopped)
 **Main Menu:**
@@ -121,8 +127,8 @@
 
 ### 🚀 Basic Sequence Creation
 1. Press **Play/Stop (26)** to start
-2. Press **step buttons (0-15)** to create gate pattern
-3. Hold **parameter button (16-21)** + move hand over sensor
+2. Press **step buttons (0-31)** to create gate pattern
+3. Hold **parameter button (16-22)** + move hand over sensor
 4. Use **AS5600** for fine adjustments
 5. Switch voices with **Voice Switch (24)**
 
@@ -141,10 +147,10 @@
 5. **Start playback** to exit
 
 ### 🎵 Slide/Legato Setup
-1. Press **Slide Mode (22)**
+1. Hold **Slide parameter button (22)**
 2. Press **step buttons** to toggle slide per step
 3. LED shows slide states
-4. Press **Slide Mode (22)** again to exit
+4. Release **Slide parameter button (22)** to exit
 
 ### 📐 Polyrhythmic Sequences
 1. Hold **parameter button** (e.g., Note)
@@ -176,4 +182,4 @@
 - Experiment with different scales for various musical moods
 - Use velocity-sensitive AS5600 control for precise adjustments
 
-**🎯 Remember:** Voice 1 = Green LEDs (rows 0-1), Voice 2 = Cyan LEDs (rows 2-3)
+**🎯 Remember:** With 4x8 matrix, you have 32 buttons total for compact yet powerful sequencing

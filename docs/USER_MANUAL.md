@@ -33,28 +33,26 @@ The PicoMudrasSequencer is an advanced polyphonic step sequencer built on the Ra
 
 ### Physical Layout
 ```
-┌─────────────────────────────────────┐
-│              OLED Display           │
-├─────┬─────┬─────┬─────┬─────┬─────┤
-│ P16 │ P17 │ P18 │ P19 │ P20 │ P21 │  Parameter Buttons
-├─────┼─────┼─────┼─────┼─────┼─────┤
-│ M22 │ M23 │ M24 │ M25 │ C26 │ C27 │  Mode & Control Buttons
-├─────┼─────┼─────┼─────┼─────┼─────┤
-│ C28 │ C29 │ C30 │ C31 │     │     │  Control Buttons
-├─────┼─────┼─────┼─────┼─────┼─────┤
-│  0  │  1  │  2  │  3  │     │     │
-├─────┼─────┼─────┼─────┤ AS5600    │  Step Matrix
-│  4  │  5  │  6  │  7  │ Encoder   │  & Sensor Area
-├─────┼─────┼─────┼─────┤           │
-│  8  │  9  │ 10  │ 11  │           │
-├─────┼─────┼─────┼─────┤           │
-│ 12  │ 13  │ 14  │ 15  │           │
-└─────┴─────┴─────┴─────┴─────┴─────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                        OLED Display                            │
+├─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┤
+│ P16 │ P17 │ P18 │ P19 │ P20 │ P21 │ P22 │ C23 │ C24 │ C25 │ C26 │
+├─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┤
+│ C27 │ C28 │ C29 │ C30 │ C31 │     │     │     │     │     │     │
+├─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┤
+│  0  │  1  │  2  │  3  │  4  │  5  │  6  │  7  │     │     │     │
+├─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┤ AS5600 Encoder │
+│  8  │  9  │ 10  │ 11  │ 12  │ 13  │ 14  │ 15  │ & Distance     │
+├─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┤ Sensor Area    │
+│ 16  │ 17  │ 18  │ 19  │ 20  │ 21  │ 22  │ 23  │                │
+├─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┤                │
+│ 24  │ 25  │ 26  │ 27  │ 28  │ 29  │ 30  │ 31  │                │
+└─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴────────────────┘
 ```
 
 ### Components
-- **32 Tactile Buttons**: Step matrix (16), parameters (6), modes/control (10)
-- **16 RGB LEDs**: Step visualization with voice color coding
+- **32 Tactile Buttons**: Step matrix (32), with parameter/control functions on specific buttons
+- **32 RGB LEDs**: Step visualization with voice color coding (4x8 matrix)
 - **OLED Display**: Real-time parameter and status information
 - **AS5600 Magnetic Encoder**: 12-bit contactless position sensor
 - **Distance Sensor**: Gesture-based parameter recording
@@ -70,7 +68,7 @@ The PicoMudrasSequencer is an advanced polyphonic step sequencer built on the Ra
 
 ### Creating Your First Sequence
 1. **Start Playback**: Press Play/Stop button (26)
-2. **Add Steps**: Press step buttons (0-15) to toggle gates
+2. **Add Steps**: Press step buttons (0-31) to toggle gates
 3. **Add Melody**: Hold Note button (16) and move hand over sensor
 4. **Adjust Volume**: Hold Velocity button (17) and move hand over sensor
 5. **Fine-tune**: Use AS5600 encoder for precise adjustments
@@ -82,8 +80,8 @@ The PicoMudrasSequencer is an advanced polyphonic step sequencer built on the Ra
 
 ## Button Reference
 
-### Step Buttons (0-15)
-**Location**: 4x4 LED matrix grid
+### Step Buttons (0-31)
+**Location**: 4x8 LED matrix grid
 **Functions**:
 - **Short Press**: Toggle gate on/off for current voice
 - **Long Press**: Select step for parameter editing
@@ -95,7 +93,7 @@ The PicoMudrasSequencer is an advanced polyphonic step sequencer built on the Ra
 - Voice 1: Steps 0-7 (rows 0-1, green LEDs)
 - Voice 2: Steps 8-15 (rows 2-3, cyan LEDs)
 
-### Parameter Buttons (16-21)
+### Parameter Buttons (16-22)
 
 #### Button 16 - Note
 - **Range**: 0-21 (scale degrees)
@@ -133,12 +131,13 @@ The PicoMudrasSequencer is an advanced polyphonic step sequencer built on the Ra
 - **Recording**: Hold + distance sensor movement
 - **Real-time**: AS5600 encoder control
 
-### Mode Buttons (22-25)
+#### Button 22 - Slide
+- **Range**: 0.0-1.0 (slide time)
+- **Function**: Controls slide/glide duration
+- **Recording**: Hold + distance sensor movement
+- **Real-time**: AS5600 encoder control
 
-#### Button 22 - Slide Mode
-- **Short Press**: Enter/exit slide mode
-- **Function**: Enables slide/legato editing
-- **Visual**: LED overlay shows slide states
+### Mode Buttons (23-25)
 
 #### Button 23 - Delay
 - **Short Press**: Toggle global delay effect
@@ -158,34 +157,34 @@ The PicoMudrasSequencer is an advanced polyphonic step sequencer built on the Ra
 ### Control Buttons (26-31)
 
 #### Button 26 - Play/Stop
-- **Short Press**: Start/stop sequencer playback
-- **Long Press** (when stopped): Enter settings mode
-- **Function**: Master transport control
+- **Function**: Start/stop sequence playback
+- **LED**: Green (playing) / Red (stopped)
+- **Usage**: Press to toggle playback
 
-#### Button 27 - Scale
-- **Short Press**: Cycle through musical scales
-- **Function**: Changes global scale for note interpretation
-- **Scales**: Mixolydian, Pentatonic Minor, Dorian, Phrygian Dom, Lydian Dom, Wholetone, Chromatic
+#### Button 27 - Change Scale
+- **Function**: Cycle through available musical scales
+- **LED**: White when pressed
+- **Usage**: Press to advance to next scale
 
-#### Button 28 - Theme
-- **Short Press**: Cycle through LED color themes
-- **Function**: Changes LED color palette
-- **Themes**: Multiple color schemes for different preferences
+#### Button 28 - Change Theme
+- **Function**: Cycle through LED color themes
+- **LED**: Various colors
+- **Usage**: Press to change visual theme
 
-#### Button 29 - Swing
-- **Short Press**: Cycle through shuffle/swing patterns
-- **Function**: Applies rhythmic feel to playback
-- **Patterns**: Various shuffle templates for different grooves
+#### Button 29 - Change Swing Pattern
+- **Function**: Adjust timing swing/groove
+- **LED**: Yellow when active
+- **Usage**: Press to cycle swing patterns
 
-#### Button 30 - Randomize 1
-- **Short Press**: Randomize Voice 1 parameters
-- **Long Press**: Reset Voice 1 to default state
-- **Function**: Generative sequence creation
+#### Button 30 - Randomize Seq1
+- **Function**: Randomize Voice 1 sequence
+- **LED**: Purple flash
+- **Usage**: Press to generate random pattern
 
-#### Button 31 - Randomize 2
-- **Short Press**: Randomize Voice 2 parameters
-- **Long Press**: Reset Voice 2 to default state
-- **Function**: Generative sequence creation
+#### Button 31 - Randomize Seq2
+- **Function**: Randomize Voice 2 sequence
+- **LED**: Purple flash
+- **Usage**: Press to generate random pattern
 
 ## Operating Modes
 
@@ -207,8 +206,8 @@ The PicoMudrasSequencer is an advanced polyphonic step sequencer built on the Ra
 ### Slide Mode
 **Enables slide/legato editing for expressive sequences.**
 
-**Entry**: Press Slide Mode button (22)
-**Exit**: Press Slide Mode button (22) again
+**Entry**: Hold Parameter Button 22 (Slide)
+**Exit**: Release Parameter Button 22
 
 **Behavior**:
 - Step buttons toggle slide on/off per step
@@ -322,16 +321,20 @@ The PicoMudrasSequencer is an advanced polyphonic step sequencer built on the Ra
 **Dual independent voices with cross-modulation capabilities.**
 
 **Voice 1**:
-- Steps 0-7 (LED rows 0-1)
+- Steps 0-15 (LED rows 0-1)
 - Green LED indication
 - Full parameter control
 - Cross-modulation source
 
 **Voice 2**:
-- Steps 8-15 (LED rows 2-3)
+- Steps 16-31 (LED rows 2-3)
 - Cyan LED indication
 - Full parameter control
 - Cross-modulation destination
+
+**Clear Layout**:
+- Voice assignment follows the traditional 16-step per voice layout
+- Compact 4x8 matrix provides intuitive voice separation
 
 ### Voice Presets
 **Six carefully crafted presets per voice optimized for different musical roles.**

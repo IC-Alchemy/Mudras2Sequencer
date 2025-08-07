@@ -143,6 +143,11 @@ void updateAS5600BaseValues(UIState& uiState)
 
     // Apply increment to the appropriate parameter with boundary checking
     applyIncrementToParameter(activeBaseValues, uiState.currentAS5600Parameter, increment);
+    
+    // Trigger OLED display for AS5600 parameter value change
+    uiState.inAS5600ParameterMode = true;
+    uiState.as5600ParameterChangeTime = millis();
+    uiState.as5600ParameterValueChanged = true; // Parameter value was changed
 }
 
 // --- Update AS5600 Step Parameter Values (Edit Mode) ---
@@ -192,6 +197,11 @@ void updateAS5600StepParameterValues(UIState& uiState)
     // Trigger immediate OLED update by updating the active voice state
     extern void updateActiveVoiceState(uint8_t stepIndex, Sequencer& activeSeq);
     updateActiveVoiceState(stepIndex, activeSeq);
+    
+    // Trigger OLED display for AS5600 parameter value change in edit mode
+    uiState.inAS5600ParameterMode = true;
+    uiState.as5600ParameterChangeTime = millis();
+    uiState.as5600ParameterValueChanged = true; // Parameter value was changed
     
     // Debug output
     Serial.print("AS5600 Edit Mode - Step ");

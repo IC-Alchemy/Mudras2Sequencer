@@ -309,17 +309,18 @@ void updateParametersForStep(uint8_t stepToUpdate) ///  This is the selected ste
     const ParamButtonMapping* heldMapping = getHeldParameterButton(uiState);
     if (heldMapping)
     {
-        // GATE-CONTROLLED NOTE PROGRAMMING: Check gate restriction for Note parameter
-        if (heldMapping->paramId == ParamId::Note)
+        // GATE-CONTROLLED PROGRAMMING: Only restrict Note and Octave parameters on LOW gate steps
+        if (heldMapping->paramId == ParamId::Note || heldMapping->paramId == ParamId::Octave)
         {
             float gateValue = activeSeq.getStepParameterValue(ParamId::Gate, stepToUpdate);
             if (gateValue <= 0.5f) // Gate is LOW (0.0)
             {
-                // Skip Note parameter editing on steps with LOW gates
-                // This protects steps from note frequency changes during programming/editing
+                // Skip Note/Octave parameter editing on steps with LOW gates
+                // This protects steps from frequency changes during programming/editing
                 return;
             }
         }
+        // All other parameters (Velocity, Filter, Attack, Decay) are allowed on all steps
 
         // Use the helper function to do the scaling correctly for any parameter.
         float valueToSet = mapNormalizedValueToParamRange(heldMapping->paramId, normalized_mm_value);
@@ -716,81 +717,8 @@ void setup1()
     seq1.start();
     seq2.start();
 
-    // Run gate-controlled functionality validation
-    validateGateControlledFunctionality();
 
     Serial.println("[CORE1] Setup complete!");
-}
-
-// Distance sensor functionality moved to src/sensors/DistanceSensor.h/.cpp
-
-// =======================
-//   GATE CONTROL VALIDATION
-// =======================
-
-/**
- * @brief Test function to validate gate-controlled note output and programming restrictions
- * This function tests both gate-controlled note output and programming restrictions
- */
-void validateGateControlledFunctionality() {
-    Serial.println("\n=== GATE-CONTROLLED FUNCTIONALITY VALIDATION ===");
-
-    // Test 1: Gate-controlled note programming restrictions
-    Serial.println("Test 1: Gate-controlled note programming restrictions");
-
-    // Set up test steps: step 0 with HIGH gate, step 1 with LOW gate
-    seq1.setStepParameterValue(ParamId::Gate, 0, 1.0f); // HIGH gate
-    seq1.setStepParameterValue(ParamId::Gate, 1, 0.0f); // LOW gate
-
-    // Try to set note values on both steps
-    float originalNote0 = seq1.getStepParameterValue(ParamId::Note, 0);
-    float originalNote1 = seq1.getStepParameterValue(ParamId::Note, 1);
-
-    seq1.setStepParameterValue(ParamId::Note, 0, 10.0f); // Should succeed (HIGH gate)
-    seq1.setStepParameterValue(ParamId::Note, 1, 15.0f); // Should be blocked (LOW gate)
-
-    float newNote0 = seq1.getStepParameterValue(ParamId::Note, 0);
-    float newNote1 = seq1.getStepParameterValue(ParamId::Note, 1);
-
-    Serial.print("  Step 0 (HIGH gate): Note changed from ");
-    Serial.print(originalNote0);
-    Serial.print(" to ");
-    Serial.print(newNote0);
-    Serial.println(newNote0 == 10.0f ? " [PASS]" : " [FAIL]");
-
-    Serial.print("  Step 1 (LOW gate): Note remained ");
-    Serial.print(newNote1);
-    Serial.print(" (should be unchanged from ");
-    Serial.print(originalNote1);
-    Serial.println(newNote1 == originalNote1 ? ") [PASS]" : ") [FAIL]");
-
-    // Test 2: Gate-controlled note output
-    Serial.println("Test 2: Gate-controlled note output");
-
-    VoiceState testVoiceState;
-    testVoiceState.note = 5.0f;
-    testVoiceState.octave = 0;
-
-    // Test HIGH gate step
-    seq1.playStepNow(0, &testVoiceState);
-    Serial.print("  HIGH gate step: VoiceState note = ");
-    Serial.print(testVoiceState.note);
-    Serial.print(", octave = ");
-    Serial.print(testVoiceState.octave);
-    Serial.println(testVoiceState.gate ? " [PASS - Gate HIGH, note updated]" : " [FAIL]");
-
-    // Test LOW gate step
-    float prevNote = testVoiceState.note;
-    int8_t prevOctave = testVoiceState.octave;
-    seq1.playStepNow(1, &testVoiceState);
-    Serial.print("  LOW gate step: VoiceState note = ");
-    Serial.print(testVoiceState.note);
-    Serial.print(", octave = ");
-    Serial.print(testVoiceState.octave);
-    Serial.println(!testVoiceState.gate && testVoiceState.note == prevNote && testVoiceState.octave == prevOctave ?
-                   " [PASS - Gate LOW, note preserved]" : " [FAIL]");
-
-    Serial.println("=== VALIDATION COMPLETE ===\n");
 }
 
 // --- Audio Loop (Core0) ---
@@ -872,8 +800,8 @@ void loop1()
     static unsigned long lastLEDUpdate = 0;
     static unsigned long lastControlUpdate = 0;
     
-    const unsigned long LED_UPDATE_INTERVAL = 10; // 30ms interval
-    const unsigned long CONTROL_UPDATE_INTERVAL = 2; // 2ms interval
+    const unsigned long LED_UPDATE_INTERVAL = 40; // 30ms interval
+    const unsigned long CONTROL_UPDATE_INTERVAL = 1; // 2ms interval
     uint16_t currtouched = touchSensor.touched();
     
 if ((currentMillis - lastControlUpdate >= CONTROL_UPDATE_INTERVAL)){  
@@ -898,7 +826,10 @@ if ((currentMillis - lastControlUpdate >= CONTROL_UPDATE_INTERVAL)){
     {
         mm = 0; // Invalid reading
     }
-
+ if (uiState.selectedStepForEdit != -1)
+        {
+            updateParametersForStep(uiState.selectedStepForEdit);
+        }
 
 }
     // Check for voice switch trigger and handle immediate OLED update
@@ -917,9 +848,6 @@ if ((currentMillis - lastControlUpdate >= CONTROL_UPDATE_INTERVAL)){
         updateControlLEDs(ledMatrix, uiState);  
         ledMatrix.show();
     }
-        if (uiState.selectedStepForEdit != -1)
-        {
-            updateParametersForStep(uiState.selectedStepForEdit);
-        }
+       
     }
 

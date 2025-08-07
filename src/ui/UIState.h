@@ -73,6 +73,11 @@ struct UIState {
    
    // --- Voice Switch State ---
    bool voiceSwitchTriggered = false;  // Flag to trigger immediate OLED update for voice switching
+   
+   // --- AS5600 Parameter Display State ---
+   bool inAS5600ParameterMode = false;  // Flag to indicate AS5600 parameter display is active
+   unsigned long as5600ParameterChangeTime = 0;  // Timestamp of last AS5600 parameter change
+   bool as5600ParameterValueChanged = false;  // Flag to indicate parameter value changed
 };
 
 #endif // UI_STATE_H

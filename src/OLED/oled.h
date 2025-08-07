@@ -113,9 +113,11 @@ private:
      * @param voice Voice number (1 or 2)
      * @param stepIndex Current step index for the parameter
      */
-    void displayParameterInfo(const char* paramName, float currentValue, 
+    void displayParameterInfo(const char* paramName, float currentValue,
                              uint8_t voice, uint8_t stepIndex);
-    
+
+
+
     /**
      * @brief Format parameter value for display
      * @param paramId Parameter ID for formatting rules
@@ -123,6 +125,21 @@ private:
      * @return Formatted string for display
      */
     String formatParameterValue(ParamId paramId, float value);
+    
+    /**
+     * @brief Format AS5600 parameter value for display
+     * @param paramMode AS5600 parameter mode for formatting rules
+     * @param value Raw parameter value
+     * @return Formatted string for display
+     */
+    String formatAS5600ParameterValue(AS5600ParameterMode paramMode, float value);
+    
+    /**
+     * @brief Get AS5600 parameter name for display
+     * @param paramMode AS5600 parameter mode
+     * @return Parameter name string
+     */
+    const char* getAS5600ParameterName(AS5600ParameterMode paramMode);
     
     /**
      * @brief Display settings menu
@@ -153,6 +170,16 @@ private:
      * @param voiceManager Pointer to voice manager for accessing voice configs
      */
     void forceUpdate(const UIState& uiState, class VoiceManager* voiceManager);
+    
+    /**
+     * @brief Display AS5600 parameter selection and value information
+     * @param uiState Current UI state containing AS5600 parameter information
+     * @param parameterName Name of the currently selected AS5600 parameter
+     * @param currentValue Current value of the AS5600 parameter (optional)
+     * @param showValue Whether to display the current value or just the parameter name
+     */
+    void displayAS5600ParameterInfo(const UIState& uiState, const char* parameterName, 
+                                   float currentValue = 0.0f, bool showValue = false);
 
 private:
     class VoiceManager* voiceManagerRef = nullptr; // Reference to voice manager for immediate updates

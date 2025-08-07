@@ -132,30 +132,33 @@ float Voice::process() {
   }
 
   // Mix oscillators
-  float mixedOscillators = 0.0f;
+float mixedOscillators = 0.0f;                     // initialise once
 
-  // Special case for percussion voices (no oscillators, only noise)
-  if (config.oscillatorCount == 0) {
+// Case 1: percussion voice – only noise
+if (oscillators.empty()) {
     mixedOscillators = noise_.Process();
-  } 
-  else if (config.oscillatorCount == 1) {
+}
+// Case 2: single oscillator
+else if (oscillators.size() == 1) {
     mixedOscillators = oscillators[0].Process();
-  } else if (config.hasDalek) { //  Has Dalek means Ring Modulation
+}
+// Case 3: Dalek/Ring-mod – multiply all oscillators
+else if (config.hasDalek) {
+        mixedOscillators = (oscillators[0].Process() * oscillators[1].Process())*4.f;
+}
+// Case 4: regular voice – add (or average) oscillators
+else {
+    for (auto &osc : oscillators)
+        mixedOscillators += osc.Process();
+    // optional: prevent clipping
+    // mixedOscillators *= 1.0f / oscillators.size();
+}
 
-    mixedOscillators = (oscillators[0].Process()) * (oscillators[1].Process());
-
-  } else {
-    for (size_t i = 0; i < oscillators.size(); i++) {
-      // Use regular oscillator
-      mixedOscillators += oscillators[i].Process();
-    }
-  }
 
   // Apply effects chain
   processEffectsChain(mixedOscillators);
-  mixedOscillators *= (.25f + (  state.velocity));
   // Apply filter
-  float filteredSignal = filter.Process(mixedOscillators);
+  float filteredSignal = filter.Process(mixedOscillators) * (.15f + (  state.velocity));;
 
   // Apply high-pass filter
   highPassFilter.Process(filteredSignal);
@@ -197,11 +200,12 @@ void Voice::setSequencer(Sequencer *seq) {
 void Voice::processEffectsChain(float &signal) {
 
   if (config.hasOverdrive) {
-    signal = overdrive.Process(signal * config.overdriveGain);
+    signal = overdrive.Process(signal )* config.overdriveGain;
   }
 
   if (config.hasWavefolder) {
     signal = wavefolder.Process(signal);
+    signal *= 1.5f; // increase level after wavefolding
   }
 }
 
@@ -245,7 +249,7 @@ void Voice::applyEnvelopeParameters() {
   float release = decay; // Use decay for release in this implementation
 
   envelope.SetAttackTime(attack);
-  envelope.SetDecayTime(0.05f + (release * 0.22f));
+  envelope.SetDecayTime(0.01f + (release * 0.22f));
   envelope.SetReleaseTime(release);
 }
 
@@ -311,24 +315,24 @@ VoiceConfig getAnalogVoice() {
   config.oscAmplitudes[1] = .33f;
   config.oscAmplitudes[2] = .33f;
   config.oscDetuning[0] = 0.0f;
-  config.oscDetuning[1] = 0.007f;  // Slight detune
-  config.oscDetuning[2] = -0.007f; // Slight detune opposite`
+  config.oscDetuning[1] = 0.03f;  // Slight detune
+  config.oscDetuning[2] = -0.02f; // Slight detune opposite`
   config.harmony[0] = 0;           // Root note
   config.harmony[1] = 0;           // Unison (no harmony)
   config.harmony[2] = 0;           // Unison (no harmony)
 
   config.filterRes = 0.43f;
-  config.filterDrive = 2.1f;
+  config.filterDrive = 2.9f;
   config.filterMode = daisysp::LadderFilter::FilterMode::LP24;
   config.filterPassbandGain = 0.23f;
   config.highPassFreq = 140.0f;
 
   config.hasOverdrive = false;
   config.hasWavefolder = false;
-  config.overdriveGain = 0.3f;
+  config.overdriveGain = 0.36f;
   config.overdriveDrive = 0.25f;
-  config.wavefolderGain = 1.5f;
-  config.wavefolderOffset = 1.0f;
+  config.wavefolderGain = 2.5f;
+  config.wavefolderOffset = .4f;
 
   config.defaultAttack = 0.04f;
   config.defaultDecay = 0.14f;
@@ -347,8 +351,8 @@ VoiceConfig getDigitalVoice() {
   config.oscAmplitudes[1] = 0.35f;
   config.oscAmplitudes[2] = .36f;
   config.oscPulseWidth[0] = 0.69f;
-  config.oscDetuning[0] = 0.0f; // Fixed duplicate assignment
-  config.oscDetuning[2] = 0.0f;
+  config.oscDetuning[1] = 0.002f; 
+  config.oscDetuning[2] = 0.003f;
   config.harmony[0] = 0; // Root note
   config.harmony[1] = 4; // PERFECT 5TH
   config.harmony[2] = 7; // Octave
@@ -358,7 +362,7 @@ VoiceConfig getDigitalVoice() {
   config.highPassFreq = 170.0f;
   config.highPassRes = 0.5f;
   config.filterMode =
-      daisysp::LadderFilter::FilterMode::LP24; // Low-pass filter
+      daisysp::LadderFilter::FilterMode::BP24; // Low-pass filter
 
   config.hasOverdrive = false;
   config.hasWavefolder = false;
@@ -407,16 +411,15 @@ VoiceConfig getBassVoice() {
 
 VoiceConfig getLeadVoice() {
   VoiceConfig config;
-  config.oscillatorCount = 3;
+  config.oscillatorCount = 2;
   config.oscWaveforms[0] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
   config.oscWaveforms[1] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
-  config.oscWaveforms[2] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
-  config.oscAmplitudes[0] = .45f;
+  config.oscWaveforms[2] = daisysp::Oscillator::WAVE_POLYBLEP_TRI;
+  config.oscAmplitudes[0] = .33f;
   config.oscAmplitudes[1] = .33f;
-  config.oscAmplitudes[2] = 0.33f;
-  config.oscDetuning[0] = 0.0f;
-  config.oscDetuning[1] = 0.014f;
-  config.oscDetuning[2] = -0.014f;
+  config.oscAmplitudes[2] = 1.f;
+  config.oscDetuning[0] = 12.0f;
+ 
   config.harmony[0] = 0; // Root note
   config.harmony[1] = 0; // Unison (lead typically monophonic)
   config.harmony[2] = 0; // Unison
@@ -446,9 +449,9 @@ VoiceConfig getPadVoice() {
   config.oscWaveforms[0] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
   config.oscWaveforms[1] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
   config.oscWaveforms[2] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
-  config.oscAmplitudes[0] = 0.36f;
-  config.oscAmplitudes[1] = 0.36f;
-  config.oscAmplitudes[2] = 0.36f;
+  config.oscAmplitudes[0] = 0.33f;
+  config.oscAmplitudes[1] = 0.3f;
+  config.oscAmplitudes[2] = 0.28f;
   config.harmony[0] = 0; // Root note
   config.harmony[1] = 4; // Perfect Fifth
   config.harmony[2] = 9; // Major Third One octave up
@@ -456,7 +459,7 @@ VoiceConfig getPadVoice() {
   config.filterRes = 0.3f;
   config.filterDrive = 1.8f;
   config.filterPassbandGain = 0.23f;
-  config.highPassFreq = 160.0f;
+  config.highPassFreq = 140.0f;
   config.filterMode =
       daisysp::LadderFilter::FilterMode::LP24; // Band-pass for percussive sound
 
@@ -467,7 +470,7 @@ VoiceConfig getPadVoice() {
   config.defaultDecay = 0.8f;
   config.defaultSustain = 0.5f;
   config.defaultRelease = .5f; // Long release
-  config.outputLevel = 1.f;    // Lower level for pad
+  config.outputLevel = .9f;    // Lower level for pad
   // config.outputLevel = 0.6f; // conLower level for pad
 
   return config;

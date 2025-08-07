@@ -130,18 +130,20 @@ float Sequencer::getStepParameterValue(ParamId id, uint8_t stepIdx) const
 
 void Sequencer::setStepParameterValue(ParamId id, uint8_t stepIdx, float value)
 {
-    // GATE-CONTROLLED NOTE PROGRAMMING: Prevent Note parameter changes on steps with LOW gates
-    if (id == ParamId::Note)
+    // GATE-CONTROLLED PROGRAMMING: Only restrict Note and Octave parameters on LOW gate steps
+    // All other parameters (Velocity, Filter, Attack, Decay) can be programmed on any step
+    if (id == ParamId::Note || id == ParamId::Octave)
     {
-        // Check if the step's gate is HIGH before allowing note programming
+        // Check if the step's gate is HIGH before allowing note/octave programming
         float gateValue = getStepParameterValue(ParamId::Gate, stepIdx);
         if (gateValue <= 0.5f) // Gate is LOW (0.0)
         {
-            // Silently ignore note programming attempts on steps with LOW gates
-            // This protects steps from note frequency changes during programming/editing
+            // Silently ignore note/octave programming attempts on steps with LOW gates
+            // This protects steps from frequency changes during programming/editing
             return;
         }
     }
+    // All other parameters (Velocity, Filter, Attack, Decay, GateLength, Slide) are allowed on all steps
 
     parameterManager.setValue(id, stepIdx, value);
 }
@@ -264,21 +266,22 @@ void Sequencer::advanceStep(uint8_t current_uclock_step, int mm_distance,
         {
             if (pb.held)
             {
-                // GATE-CONTROLLED NOTE PROGRAMMING: Check gate restriction for Note parameter
-                if (pb.id == ParamId::Note)
+                // GATE-CONTROLLED PROGRAMMING: Only restrict Note and Octave parameters on LOW gate steps
+                if (pb.id == ParamId::Note || pb.id == ParamId::Octave)
                 {
                     uint8_t paramStepIdx = currentStepPerParam[static_cast<size_t>(pb.id)];
                     float gateValue = getStepParameterValue(ParamId::Gate, paramStepIdx);
                     if (gateValue <= 0.5f) // Gate is LOW (0.0)
                     {
-                        // Skip Note parameter recording on steps with LOW gates
+                        // Skip Note/Octave parameter recording on steps with LOW gates
                         continue;
                     }
                 }
+                // All other parameters (Velocity, Filter, Attack, Decay) are allowed on all steps
 
                 parametersRecorded = true;
 
-                // For all other parameters, scale the normalized value to the parameter's range
+                // For all parameters, scale the normalized value to the parameter's range
                 float value = mapNormalizedValueToParamRange(pb.id, normalizedDistance);
                 // Use the parameter's own current step index for recording
                 uint8_t paramStepIdx = currentStepPerParam[static_cast<size_t>(pb.id)];
