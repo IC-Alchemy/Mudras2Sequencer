@@ -611,7 +611,7 @@ void setup1()
     usb_midi.begin(MIDI_CHANNEL_OMNI);
     delay(100);
 
-    Serial.begin(115200);
+   Serial.begin(115200);
 
   Serial.print("[CORE1] Setup starting... ");
 
@@ -717,80 +717,8 @@ void setup1()
     seq2.start();
 
     // Run gate-controlled functionality validation
-    validateGateControlledFunctionality();
 
     Serial.println("[CORE1] Setup complete!");
-}
-
-// Distance sensor functionality moved to src/sensors/DistanceSensor.h/.cpp
-
-// =======================
-//   GATE CONTROL VALIDATION
-// =======================
-
-/**
- * @brief Test function to validate gate-controlled note output and programming restrictions
- * This function tests both gate-controlled note output and programming restrictions
- */
-void validateGateControlledFunctionality() {
-    Serial.println("\n=== GATE-CONTROLLED FUNCTIONALITY VALIDATION ===");
-
-    // Test 1: Gate-controlled note programming restrictions
-    Serial.println("Test 1: Gate-controlled note programming restrictions");
-
-    // Set up test steps: step 0 with HIGH gate, step 1 with LOW gate
-    seq1.setStepParameterValue(ParamId::Gate, 0, 1.0f); // HIGH gate
-    seq1.setStepParameterValue(ParamId::Gate, 1, 0.0f); // LOW gate
-
-    // Try to set note values on both steps
-    float originalNote0 = seq1.getStepParameterValue(ParamId::Note, 0);
-    float originalNote1 = seq1.getStepParameterValue(ParamId::Note, 1);
-
-    seq1.setStepParameterValue(ParamId::Note, 0, 10.0f); // Should succeed (HIGH gate)
-    seq1.setStepParameterValue(ParamId::Note, 1, 15.0f); // Should be blocked (LOW gate)
-
-    float newNote0 = seq1.getStepParameterValue(ParamId::Note, 0);
-    float newNote1 = seq1.getStepParameterValue(ParamId::Note, 1);
-
-    Serial.print("  Step 0 (HIGH gate): Note changed from ");
-    Serial.print(originalNote0);
-    Serial.print(" to ");
-    Serial.print(newNote0);
-    Serial.println(newNote0 == 10.0f ? " [PASS]" : " [FAIL]");
-
-    Serial.print("  Step 1 (LOW gate): Note remained ");
-    Serial.print(newNote1);
-    Serial.print(" (should be unchanged from ");
-    Serial.print(originalNote1);
-    Serial.println(newNote1 == originalNote1 ? ") [PASS]" : ") [FAIL]");
-
-    // Test 2: Gate-controlled note output
-    Serial.println("Test 2: Gate-controlled note output");
-
-    VoiceState testVoiceState;
-    testVoiceState.note = 5.0f;
-    testVoiceState.octave = 0;
-
-    // Test HIGH gate step
-    seq1.playStepNow(0, &testVoiceState);
-    Serial.print("  HIGH gate step: VoiceState note = ");
-    Serial.print(testVoiceState.note);
-    Serial.print(", octave = ");
-    Serial.print(testVoiceState.octave);
-    Serial.println(testVoiceState.gate ? " [PASS - Gate HIGH, note updated]" : " [FAIL]");
-
-    // Test LOW gate step
-    float prevNote = testVoiceState.note;
-    int8_t prevOctave = testVoiceState.octave;
-    seq1.playStepNow(1, &testVoiceState);
-    Serial.print("  LOW gate step: VoiceState note = ");
-    Serial.print(testVoiceState.note);
-    Serial.print(", octave = ");
-    Serial.print(testVoiceState.octave);
-    Serial.println(!testVoiceState.gate && testVoiceState.note == prevNote && testVoiceState.octave == prevOctave ?
-                   " [PASS - Gate LOW, note preserved]" : " [FAIL]");
-
-    Serial.println("=== VALIDATION COMPLETE ===\n");
 }
 
 // --- Audio Loop (Core0) ---

@@ -140,7 +140,7 @@ void ParameterManager::randomizeParameters()
                 break;
             }
             case ParamId::Decay: {
-                std::uniform_real_distribution<float> dist(0.08f, 0.5f);
+                std::uniform_real_distribution<float> dist(0.02f, 0.5f);
                 _tracks[i].setValue(step, dist(generator));
                 break;
             }

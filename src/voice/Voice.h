@@ -223,6 +223,7 @@ private:
     // Audio processing components
     std::vector<daisysp::Oscillator> oscillators;
     daisysp::WhiteNoise noise_;
+    daisysp::Particle particle_;
     daisysp::LadderFilter filter;
     daisysp::Svf highPassFilter;
     daisysp::Adsr envelope;

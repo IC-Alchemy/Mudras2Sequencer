@@ -227,12 +227,12 @@ static bool handleParameterButtonEvent(const MatrixButtonEvent &evt,
       bool pressed = (evt.type == MATRIX_BUTTON_PRESSED);
       uiState.parameterButtonHeld[static_cast<int>(mapping.paramId)] = pressed;
 
-      Serial.print("Button ");
-      Serial.print(mapping.buttonIndex);
-      Serial.print(" (");
-      Serial.print(mapping.name);
-      Serial.print(") ");
-      Serial.println(pressed ? "pressed" : "released");
+    //  Serial.print("Button ");
+    //  Serial.print(mapping.buttonIndex);
+    //  Serial.print(" (");
+    //  Serial.print(mapping.name);
+    //  Serial.print(") ");
+    //  Serial.println(pressed ? "pressed" : "released");
 
       // Automatically select AS5600 parameter if not the Note parameter and
       // button is pressed
@@ -247,16 +247,16 @@ static bool handleParameterButtonEvent(const MatrixButtonEvent &evt,
         if (uiState.currentEditParameter == mapping.paramId) {
           // Toggle off - stop editing this parameter
           uiState.currentEditParameter = ParamId::Count;
-          Serial.print("Edit mode: Stopped editing ");
-          Serial.println(mapping.name);
+        //  Serial.print("Edit mode: Stopped editing ");
+        //  Serial.println(mapping.name);
         } else {
           // Toggle on - start editing this parameter
           uiState.currentEditParameter = mapping.paramId;
           autoSelectAS5600Parameter(mapping.paramId, uiState);
-          Serial.print("Edit mode: Started editing ");
-          Serial.print(mapping.name);
-          Serial.print(" for step ");
-          Serial.println(uiState.selectedStepForEdit);
+      //    Serial.print("Edit mode: Started editing ");
+      //    Serial.print(mapping.name);
+        //  Serial.print(" for step ");
+        //  Serial.println(uiState.selectedStepForEdit);
         }
       }
       return true;
@@ -284,14 +284,14 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
           // Voice 1 preset selection
           uiState.voice1PresetIndex = evt.buttonIndex;
           applyVoicePreset(1, evt.buttonIndex);
-          Serial.print("Voice 1 preset set to: ");
-          Serial.println(VoicePresets::getPresetName(evt.buttonIndex));
+         // Serial.print("Voice 1 preset set to: ");
+         // Serial.println(VoicePresets::getPresetName(evt.buttonIndex));
         } else if (uiState.settingsMenuIndex == 1) {
           // Voice 2 preset selection  
           uiState.voice2PresetIndex = evt.buttonIndex;
           applyVoicePreset(2, evt.buttonIndex);
-          Serial.print("Voice 2 preset set to: ");
-          Serial.println(VoicePresets::getPresetName(evt.buttonIndex));
+       //   Serial.print("Voice 2 preset set to: ");
+        //  Serial.println(VoicePresets::getPresetName(evt.buttonIndex));
         }
         // Exit preset selection mode after applying preset
         uiState.inPresetSelection = false;
@@ -388,8 +388,8 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
         // Store selected voice and enter preset selection mode
         uiState.settingsMenuIndex = evt.buttonIndex;
         uiState.inPresetSelection = true;
-        Serial.print("Entered preset selection for Voice ");
-        Serial.println(evt.buttonIndex + 1);
+       // Serial.print("Entered preset selection for Voice ");
+       // Serial.println(evt.buttonIndex + 1);
       }
     }
     return true; // Event was handled
@@ -405,10 +405,10 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
       uint8_t newStepCount = evt.buttonIndex + 1;
       currentActiveSeq.setParameterStepCount(heldMapping->paramId,
                                              newStepCount);
-      Serial.print("Set ");
-      Serial.print(heldMapping->name);
-      Serial.print(" parameter length to ");
-      Serial.println(newStepCount);
+      //Serial.print("Set ");
+    // Serial.print(heldMapping->name);
+     // Serial.print(" parameter length to ");
+     // Serial.println(newStepCount);
     }
     return true;
   }
@@ -514,9 +514,9 @@ static void handleControlButtonEvent(uint8_t buttonIndex, UIState &uiState,
     uiState.flash23Until = millis() + CONTROL_LED_FLASH_DURATION_MS;
     if (uiState.delayOn) {
       uiState.currentAS5600Parameter = AS5600ParameterMode::DelayTime;
-      Serial.println("Delay ON - AS5600 set to Delay Time");
+    //  Serial.println("Delay ON - AS5600 set to Delay Time");
     } else {
-      Serial.println("Delay OFF");
+    //  Serial.println("Delay OFF");
     }
     break;
   }
@@ -548,8 +548,8 @@ static void autoSelectAS5600Parameter(ParamId paramId, UIState &uiState) {
 
   if (isValid && newAS5600Param != uiState.currentAS5600Parameter) {
     uiState.currentAS5600Parameter = newAS5600Param;
-    Serial.print("AS5600 auto-selected: ");
-    Serial.println(CORE_PARAMETERS[static_cast<int>(paramId)].name);
+   // Serial.print("AS5600 auto-selected: ");
+   // Serial.println(CORE_PARAMETERS[static_cast<int>(paramId)].name);
   }
 }
 
