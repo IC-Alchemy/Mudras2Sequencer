@@ -162,7 +162,8 @@ struct VoiceState
     float octave = 0.f;     // Octave offset in semitones (-12, 0, +12)
     uint16_t gateLength = PULSES_PER_SEQUENCER_STEP/2;
 
-    bool gate = true;
+    // Default gate to LOW to ensure silence until sequencer explicitly gates HIGH
+    bool gate = false;
     bool slide = false;
     bool retrigger = false; // Add this flag to command the envelope to re-start
 };

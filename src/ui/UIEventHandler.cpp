@@ -24,12 +24,20 @@ extern std::unique_ptr<VoiceManager> voiceManager;
 extern uint8_t leadVoiceId;
 extern uint8_t bassVoiceId;
 
+extern uint8_t voice3Id;
+extern uint8_t voice4Id;
+extern Sequencer seq1;
+extern Sequencer seq2;
+extern Sequencer seq3;
+extern Sequencer seq4;
+
 // Helper function declarations (static to this file)
 static bool handleParameterButtonEvent(const MatrixButtonEvent &evt,
                                        UIState &uiState);
 static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
                                   UIState &uiState, Sequencer &seq1,
-                                  Sequencer &seq2);
+                                  Sequencer &seq2, Sequencer &seq3,
+                                  Sequencer &seq4);
 
 static void autoSelectAS5600Parameter(ParamId paramId, UIState &uiState);
 static void handleAS5600ParameterControl(UIState &uiState);
@@ -44,6 +52,33 @@ void initUIEventHandler(UIState &uiState) {
   uiState.voice2PresetIndex = 1; // Digital preset
 }
 
+/**
+ * Consolidated handler implementation (array-of-pointers + count).
+ * For now, this forwards to the existing 2-sequencer handler using the first two
+ * entries when available. Additional sequencers are handled internally where needed.
+ */
+void matrixEventHandler(const MatrixButtonEvent &evt, UIState &uiState,
+                        Sequencer* const* sequencers, size_t sequencerCount,
+                        MidiNoteManager &midiNoteManager) {
+  // Forward to existing 2-sequencer handler using the first two entries when available.
+  if (sequencers && sequencerCount >= 2 && sequencers[0] && sequencers[1]) {
+    matrixEventHandler(evt, uiState, *sequencers[0], *sequencers[1], midiNoteManager);
+  } else {
+    // Fallback to globals for safety
+    matrixEventHandler(evt, uiState, seq1, seq2, midiNoteManager);
+  }
+}
+
+// Compatibility overload: 4 sequencers -> forward to consolidated
+void matrixEventHandler(const MatrixButtonEvent &evt, UIState &uiState,
+                        Sequencer &seq1Ref, Sequencer &seq2Ref,
+                        Sequencer &seq3Ref, Sequencer &seq4Ref,
+                        MidiNoteManager &midiNoteManager) {
+  Sequencer* seqs[4] = { &seq1Ref, &seq2Ref, &seq3Ref, &seq4Ref };
+  matrixEventHandler(evt, uiState, seqs, 4, midiNoteManager);
+}
+
+// Existing 2-sequencer handler (kept for compatibility)
 void matrixEventHandler(const MatrixButtonEvent &evt, UIState &uiState,
                         Sequencer &seq1, Sequencer &seq2,
                         MidiNoteManager &midiNoteManager) {
@@ -72,32 +107,31 @@ if (evt.buttonIndex == BUTTON_SLIDE_MODE) {
     }
     return; // Exit after handling
 }
-  // Handle Voice Switch (Button 24) with long press for LFO mode
+  // Handle Voice Switch (Button 24) cycles through 4 voices
   if (evt.buttonIndex == BUTTON_VOICE_SWITCH) {
     if (evt.type == MATRIX_BUTTON_PRESSED) {
-    
         midiNoteManager.onModeSwitch();
-        uiState.isVoice2Mode = !uiState.isVoice2Mode;
+        uiState.selectedVoiceIndex = (uiState.selectedVoiceIndex + 1) % 4;
+        uiState.isVoice2Mode = (uiState.selectedVoiceIndex == 1); // Legacy compatibility
         uiState.selectedStepForEdit = -1;
         uiState.voiceSwitchTriggered = true;  // Set flag for immediate OLED update
         Serial.print("Switched to Voice ");
-        Serial.println(uiState.isVoice2Mode ? "2" : "1");
-        
-        // Trigger immediate OLED update for voice switching
-        // Note: This requires access to the global display and voiceManager objects
-        // The actual call will be made from the main file where these objects are accessible
+        Serial.println(uiState.selectedVoiceIndex + 1);
       }
-    
     return; // Exit after handling
   }
 
   // --- Handle step buttons in slide mode ---
   if (uiState.slideMode && evt.buttonIndex < NUMBER_OF_STEP_BUTTONS) {
     if (evt.type == MATRIX_BUTTON_PRESSED) {
-      Sequencer &currentActiveSeq = uiState.isVoice2Mode ? seq2 : seq1;
+      Sequencer *seqPtr = (uiState.selectedVoiceIndex == 0) ? &seq1 :
+                          (uiState.selectedVoiceIndex == 1) ? &seq2 :
+                          (uiState.selectedVoiceIndex == 2) ? &seq3 : &seq4;
+      Sequencer &currentActiveSeq = *seqPtr;
       uint8_t currentSlideValue = currentActiveSeq.getStepParameterValue(
           ParamId::Slide, evt.buttonIndex);
       uint8_t newSlideValue = (currentSlideValue > 0) ? 0 : 1;
+      currentSlideValue = newSlideValue;
       currentActiveSeq.setStepParameterValue(ParamId::Slide, evt.buttonIndex,
                                              newSlideValue);
       Serial.print("Step ");
@@ -111,7 +145,7 @@ if (evt.buttonIndex == BUTTON_SLIDE_MODE) {
   // Handle other buttons
   if (handleParameterButtonEvent(evt, uiState))
     return;
-  if (handleStepButtonEvent(evt, uiState, seq1, seq2))
+  if (handleStepButtonEvent(evt, uiState, seq1, seq2, seq3, seq4))
     return;
 
   // Handle Randomize 1 button: short press randomizes, long press resets
@@ -267,7 +301,8 @@ static bool handleParameterButtonEvent(const MatrixButtonEvent &evt,
 
 static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
                                   UIState &uiState, Sequencer &seq1,
-                                  Sequencer &seq2) {
+                                  Sequencer &seq2, Sequencer &seq3,
+                                  Sequencer &seq4) {
   // Ignore out-of-bounds button indices
   if (evt.buttonIndex >= NUMBER_OF_STEP_BUTTONS) {
     return false;
@@ -287,11 +322,17 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
          // Serial.print("Voice 1 preset set to: ");
          // Serial.println(VoicePresets::getPresetName(evt.buttonIndex));
         } else if (uiState.settingsMenuIndex == 1) {
-          // Voice 2 preset selection  
+          // Voice 2 preset selection
           uiState.voice2PresetIndex = evt.buttonIndex;
           applyVoicePreset(2, evt.buttonIndex);
-       //   Serial.print("Voice 2 preset set to: ");
-        //  Serial.println(VoicePresets::getPresetName(evt.buttonIndex));
+        } else if (uiState.settingsMenuIndex == 2) {
+          // Voice 3 preset selection
+          uiState.voice3PresetIndex = evt.buttonIndex;
+          applyVoicePreset(3, evt.buttonIndex);
+        } else if (uiState.settingsMenuIndex == 3) {
+          // Voice 4 preset selection
+          uiState.voice4PresetIndex = evt.buttonIndex;
+          applyVoicePreset(4, evt.buttonIndex);
         }
         // Exit preset selection mode after applying preset
         uiState.inPresetSelection = false;
@@ -299,18 +340,21 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
     } else {
       // Handle voice parameter toggles (buttons 9-24)
       if (evt.buttonIndex >= 9 && evt.buttonIndex <= 24 && voiceManager) {
-              // Use the currently selected voice (respecting isVoice2Mode) instead of button index
-              uint8_t currentVoiceId = uiState.isVoice2Mode ? bassVoiceId : leadVoiceId;
+              // Use the currently selected voice (1-4)
+              uint8_t selectedIndex = uiState.selectedVoiceIndex;
+              uint8_t currentVoiceId = (selectedIndex == 0) ? leadVoiceId :
+                                       (selectedIndex == 1) ? bassVoiceId :
+                                       (selectedIndex == 2) ? voice3Id : voice4Id;
               VoiceConfig* config = voiceManager->getVoiceConfig(currentVoiceId);
-      
+
               if (config) {
                 // Set voice parameter editing state
                 uiState.inVoiceParameterMode = true;
                 uiState.lastVoiceParameterButton = evt.buttonIndex;
                 uiState.voiceParameterChangeTime = millis();
 
-                // Get the correct voice number for display (1 or 2)
-                uint8_t displayVoiceNumber = uiState.isVoice2Mode ? 2 : 1;
+                // Display voice number 1..4
+                uint8_t displayVoiceNumber = selectedIndex + 1;
 
                 switch (evt.buttonIndex) {
                   case 9: // Toggle hasEnvelope per voice
@@ -336,7 +380,7 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
                     Serial.print(" wavefolder ");
                     Serial.println(config->hasWavefolder ? "ON" : "OFF");
                     break;
-      
+
                   case 12: // Cycle through filterMode
                     {
                       int currentMode = static_cast<int>(config->filterMode);
@@ -370,7 +414,7 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
                     Serial.print(" dalek ");
                     Serial.println(config->hasDalek ? "ON" : "OFF");
                     break;
-      
+
                   default:
                     // Buttons 15-24 reserved for future voice parameters
                     Serial.print("Voice parameter button ");
@@ -378,13 +422,13 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
                     Serial.println(" - not yet implemented");
                     break;
                 }
-      
+
                 // Apply the updated configuration to the voice
                 voiceManager->setVoiceConfig(currentVoiceId, *config);
               }
             }
       // When in main settings menu, handle voice selection
-      else if (evt.buttonIndex < 2) { // Only Voice 1 and Voice 2 options available
+      else if (evt.buttonIndex < 4) { // Voices 1-4
         // Store selected voice and enter preset selection mode
         uiState.settingsMenuIndex = evt.buttonIndex;
         uiState.inPresetSelection = true;
@@ -394,8 +438,10 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
     }
     return true; // Event was handled
   }
-  // Select current active sequencer based on voice mode
-  Sequencer &currentActiveSeq = uiState.isVoice2Mode ? seq2 : seq1;
+  // Select current active sequencer based on selected voice (1-4)
+  Sequencer &currentActiveSeq = (uiState.selectedVoiceIndex == 0) ? seq1 :
+                                (uiState.selectedVoiceIndex == 1) ? seq2 :
+                                (uiState.selectedVoiceIndex == 2) ? seq3 : seq4;
 
   // --- If holding any parameter button, pressing a step button will adjust
   // length of corresponding parameter ---

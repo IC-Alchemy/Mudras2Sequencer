@@ -60,8 +60,16 @@ void Voice::init(float sr)
   noise_.Init();
   noise_.SetSeed(1);
   noise_.SetAmp(1.0f);
+
+  // Initialize particle engine
   particle_.Init(sampleRate);
   particle_.SetFreq(220.f);
+  particle_.SetResonance(config.particleResonance);
+  particle_.SetDensity(config.particleDensity);
+  particle_.SetGain(config.particleGain);
+  particle_.SetSpread(config.particleSpread);
+  particle_.SetSync(config.particleSync);
+
   // Initialize filter
   filter.Init(sampleRate);
   filter.SetFreq(filterFrequency);
@@ -123,6 +131,7 @@ float Voice::process()
     return 0.0f;
   }
 
+
   // Handle envelope retrigger
   if (state.retrigger)
   {
@@ -131,7 +140,8 @@ float Voice::process()
   }
 
   // Process envelope
-  float envelopeValue = config.hasEnvelope ? envelope.Process(gate) : 1.0f;
+ // float envelopeValue = config.hasEnvelope ? envelope.Process(gate) : 1.0f;
+  float envelopeValue =  envelope.Process(gate);
 
   // Update filter frequency with envelope modulation
   filter.SetFreq(100.f + (filterFrequency * envelopeValue) +
@@ -147,56 +157,54 @@ float Voice::process()
     }
   }
 
-  // Mix oscillators
+  // Mix voice signal (supports oscillator mix, ring-mod, noise, or particle engine)
   float mixedOscillators = 0.0f;
 
-  // Special case for percussion voices (no oscillators, only noise)
-  if (config.oscillatorCount == 0)
+  if (config.useParticleEngine)
   {
+    // Particle synthesis path
+    mixedOscillators = particle_.Process();
+  }
+  else if (config.oscillatorCount == 0)
+  {
+    // Special case for percussion voices (no oscillators, only noise)
     mixedOscillators = noise_.Process();
   }
-  else if (config.oscillatorCount == 1)
-  {
-    mixedOscillators = oscillators[0].Process();
-  }
+
   else if (config.hasDalek)
-  { //  Has Dalek means Ring Modulation
+  {
+    // Ring Modulation across oscillators
     mixedOscillators = 1.f;
     for (size_t i = 0; i < oscillators.size(); i++)
     {
-      // Use regular oscillator
       mixedOscillators *= oscillators[i].Process();
     }
-    mixedOscillators = mixedOscillators * 2.f;
+    mixedOscillators *= 2.f;
   }
-  else if (config.oscillatorCount > 3)
+  else
   {
-    mixedOscillators = particle_.Process();
-  }
-  {
-    else
+    for (size_t i = 0; i < oscillators.size(); i++)
     {
-      for (size_t i = 0; i < oscillators.size(); i++)
-      {
-        // Use regular oscillator
-        mixedOscillators += oscillators[i].Process();
-      }
+      mixedOscillators += oscillators[i].Process();
     }
+  }
 
-    // Apply effects chain
-    processEffectsChain(mixedOscillators);
-    mixedOscillators *= (.25f + (state.velocity));
-    // Apply filter
-    float filteredSignal = filter.Process(mixedOscillators);
+  // Apply effects chain
+  processEffectsChain(mixedOscillators);
+  mixedOscillators *= (.25f + (state.velocity));
+  // Apply filter
+  float filteredSignal = filter.Process(mixedOscillators);
 
-    // Apply high-pass filter
-    highPassFilter.Process(filteredSignal);
-    float highPassedSignal = highPassFilter.High();
+  // Apply high-pass filter
+  highPassFilter.Process(filteredSignal);
+  float highPassedSignal = highPassFilter.High();
 
-    // Apply envelope to final output
-    float finalOutput = highPassedSignal * (envelopeValue)*config.outputLevel;
+  // Apply envelope to final output
+  float finalOutput = highPassedSignal * (envelopeValue) * config.outputLevel;
 
-    return finalOutput;
+
+
+  return finalOutput;
   }
 
   void Voice::updateParameters(const VoiceState &newState)
@@ -211,7 +219,7 @@ float Voice::process()
 
     // Calculate and set filter frequency
     filterFrequency =
-        daisysp::fmap(state.filter, 150.0f, 7710.0f, daisysp::Mapping::EXP);
+        daisysp::fmap(state.filter, 150.0f, 9710.0f, daisysp::Mapping::EXP);
 
     // Update oscillator frequencies
     updateOscillatorFrequencies();
@@ -246,13 +254,24 @@ float Voice::process()
 
   void Voice::updateOscillatorFrequencies()
   {
-    // GATE-CONTROLLED FREQUENCY UPDATES: Only update oscillator frequencies when gate is HIGH
-    // This works in conjunction with the sequencer's gate-controlled note output
-    // The sequencer only updates state.note and state.octave when gate is HIGH,
-    // but we add this check as an additional safeguard and optimization
+    // GATE-CONTROLLED FREQUENCY UPDATES: Only update frequencies when gate is HIGH
     if (!state.gate)
     {
       return; // Skip frequency updates when gate is LOW
+    }
+
+    // Particle engine path uses a single center frequency following the base note
+    if (config.useParticleEngine)
+    {
+      float baseFreq = calculateNoteFrequency(state.note, state.octave, config.harmony[0]);
+      particle_.SetFreq(baseFreq);
+      // Keep particle params in sync with config (in case edited live)
+      particle_.SetResonance(config.particleResonance);
+      particle_.SetDensity(config.particleDensity);
+      particle_.SetGain(config.particleGain);
+      particle_.SetSpread(config.particleSpread);
+      particle_.SetSync(config.particleSync);
+      return;
     }
 
     // Update each oscillator with harmony intervals and detuning
@@ -261,10 +280,7 @@ float Voice::process()
       // Calculate frequency for this oscillator using harmony interval
       float harmonyFreq =
           calculateNoteFrequency(state.note, state.octave, config.harmony[i]);
-
       // Apply TripleSaw-style percentage detuning on top of harmony
-      // config.oscDetuning[i] is treated as a multiplier for 5% detuning amount
-      // Positive values detune up, negative values detune down
       float targetFreq = harmonyFreq + (0.05f * harmonyFreq * config.oscDetuning[i]);
       if (state.slide)
       {
@@ -291,7 +307,7 @@ float Voice::process()
     float release = decay; // Use decay for release in this implementation
 
     envelope.SetAttackTime(attack);
-    envelope.SetDecayTime(0.07f + (release * 0.22f));
+    envelope.SetDecayTime(0.01f + (release * 0.22f));
     envelope.SetReleaseTime(release);
   }
 
@@ -385,11 +401,11 @@ float Voice::process()
       config.oscAmplitudes[1] = .33f;
       config.oscAmplitudes[2] = .33f;
       config.oscDetuning[0] = 0.0f;
-      config.oscDetuning[1] = 0.11;   // Slight detune
-      config.oscDetuning[2] = -0.11f; // Slight detune opposite`
-      config.harmony[0] = 7;          // Root note
-      config.harmony[1] = 7;          // Unison (no harmony)
-      config.harmony[2] = 7;          // Unison (no harmony)
+      config.oscDetuning[1] = 0.04;   // Slight detune
+      config.oscDetuning[2] = -0.041f; // Slight detune opposite`
+      config.harmony[0] = 0;          // Root note
+      config.harmony[1] = 0;          // Unison (no harmony)
+      config.harmony[2] = 0;          // Unison (no harmony)
 
       config.filterRes = 0.43f;
       config.filterDrive = 2.1f;
@@ -528,7 +544,7 @@ float Voice::process()
       config.oscAmplitudes[0] = 0.36f;
       config.oscAmplitudes[1] = 0.36f;
       config.oscAmplitudes[2] = 0.36f;
-      config.harmony[0] = 7; // Root note
+      config.harmony[0] = 0; // Root note
       config.harmony[1] = 4; // Perfect Fifth
       config.harmony[2] = 9; // Major Third One octave up
 
@@ -590,11 +606,42 @@ float Voice::process()
       return config;
     }
 
+    VoiceConfig getParticleVoice()
+    {
+      VoiceConfig config;
+      // Use particle engine instead of oscillators
+      config.useParticleEngine = true;
+      config.oscillatorCount = 0; // Ignored when useParticleEngine is true
+      // Particle defaults (tweak as desired)
+      config.particleResonance = 0.9f;
+      config.particleDensity   = 0.5f;
+      config.particleGain      = 0.8f;
+      config.particleSpread    = 2.0f;
+      config.particleSync      = false;
+
+      // Filtering/envelope for particle timbre
+      config.filterRes = 0.35f;
+      config.filterDrive = 2.0f;
+      config.filterPassbandGain = 0.23f;
+      config.highPassFreq = 120.0f;
+      config.filterMode = daisysp::LadderFilter::FilterMode::LP24;
+
+      config.hasOverdrive = false;
+      config.hasWavefolder = false;
+
+      config.defaultAttack = 0.01f;
+      config.defaultDecay = 0.18f;
+      config.defaultSustain = 0.4f;
+      config.defaultRelease = 0.12f;
+      config.outputLevel = 0.7f;
+      return config;
+    }
+
     // Preset name mapping for settings menu
     static const char *VOICE_PRESET_NAMES[] = {"Analog", "Digital", "Bass",
-                                               "Lead", "Pad", "Percussion"};
+                                               "Lead", "Pad", "Percussion", "Particle"};
 
-    static const uint8_t VOICE_PRESET_COUNT = 6;
+    static const uint8_t VOICE_PRESET_COUNT = 7;
 
     const char *getPresetName(uint8_t presetIndex)
     {
@@ -621,6 +668,8 @@ float Voice::process()
         return getPadVoice();
       case 5:
         return getPercussionVoice();
+      case 6:
+        return getParticleVoice();
       default:
         return getAnalogVoice(); // Default fallback
       }

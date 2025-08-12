@@ -16,9 +16,9 @@ bool OLEDDisplay::begin() {
         Serial.println("[ERROR] OLED display initialization failed!");
         return false;
     }
-    
+
     initialized = true;
-    
+
     // Clear the display and show startup message
     display.clearDisplay();
     display.setTextSize(1);
@@ -55,7 +55,7 @@ void OLEDDisplay::displayVoiceParameterToggles(const UIState& uiState, VoiceMana
     // Compact header with current voice indicator
     display.setCursor(2, 2);
     display.print("VOICE PARAMS - EDITING V");
-    display.print(uiState.isVoice2Mode ? "2" : "1");
+    display.print(uiState.selectedVoiceIndex + 1);
 
     // Draw separator line
     display.drawFastHLine(2, 10, SCREEN_WIDTH - 4, SH110X_WHITE);
@@ -64,27 +64,33 @@ void OLEDDisplay::displayVoiceParameterToggles(const UIState& uiState, VoiceMana
     extern uint8_t leadVoiceId;
     extern uint8_t bassVoiceId;
 
+    extern uint8_t voice3Id;
+    extern uint8_t voice4Id;
+
     // Compact parameter display for 2 voices
     const char* paramNames[] = {"E", "O", "W", "F", "R", "D"}; // Single letters
     const int paramButtons[] = {9, 10, 11, 12, 13, 14};
     const int numParams = 6;
 
     // Voice IDs to display
-    uint8_t voiceIds[] = {leadVoiceId, bassVoiceId};
-    const char* voiceLabels[] = {"V1", "V2"};
+    uint8_t voiceIds[] = {leadVoiceId, bassVoiceId, voice3Id, voice4Id};
+    const char* voiceLabels[] = {"V1", "V2", "V3", "V4"};
 
-    // Show parameters for both voices in compact grid
-    for (int voiceIndex = 0; voiceIndex < 2; voiceIndex++) {
+    // Show parameters for all voices in compact grid (2 rows x 2 columns)
+    for (int voiceIndex = 0; voiceIndex < 4; voiceIndex++) {
         uint8_t voiceId = voiceIds[voiceIndex];
         VoiceConfig* config = voiceManager->getVoiceConfig(voiceId);
         if (!config) continue;
 
-        int yStart = 13 + (voiceIndex * 18);
+        // Layout: two rows (y=13, y=31) and two columns (x offsets)
+        int row = voiceIndex / 2;  // 0 or 1
+        int col = voiceIndex % 2;  // 0 or 1
+        int yStart = 13 + (row * 18);
+        int xStart = (col == 0) ? 2 : 66; // split screen
 
         // Voice header with selection indicator
-        display.setCursor(2, yStart);
-        bool isCurrentVoice = (voiceIndex == 0 && !uiState.isVoice2Mode) ||
-                             (voiceIndex == 1 && uiState.isVoice2Mode);
+        display.setCursor(xStart, yStart);
+        bool isCurrentVoice = (voiceIndex == uiState.selectedVoiceIndex);
 
         if (isCurrentVoice) {
             display.print("*");  // Indicate currently selected voice being edited
@@ -92,19 +98,19 @@ void OLEDDisplay::displayVoiceParameterToggles(const UIState& uiState, VoiceMana
             display.print(" ");
         }
         display.print(voiceLabels[voiceIndex]);
-        
+
         // Parameter states in compact format
         for (int i = 0; i < numParams; i++) {
-            int xPos = 5 + (i * 22); // Tighter spacing
+            int xPos = xStart + 10 + (i * 10); // denser per-voice grid
             display.setCursor(xPos, yStart);
-            
+
             // Get parameter state
             bool paramState = false;
             switch (paramButtons[i]) {
                 case 9: paramState = config->hasEnvelope; break;
                 case 10: paramState = config->hasOverdrive; break;
                 case 11: paramState = config->hasWavefolder; break;
-                case 12: 
+                case 12:
                     // Show filter mode as number (0-4)
                     display.print(static_cast<int>(config->filterMode));
                     continue;
@@ -114,34 +120,34 @@ void OLEDDisplay::displayVoiceParameterToggles(const UIState& uiState, VoiceMana
                     continue;
                 case 14: paramState = config->hasDalek; break;
             }
-            
+
             // Display compact ON/OFF state
             if (paramButtons[i] != 12 && paramButtons[i] != 13) {
-                display.print(paramState ? "1" : "0"); // Use 1/0 instead of ON/OFF
+                display.print(paramState ? "1" : "0");
             }
         }
-        
+
         // Parameter labels on second line (single letters)
         for (int i = 0; i < numParams; i++) {
-            int xPos = 5 + (i * 22);
+            int xPos = xStart + 10 + (i * 10);
             display.setCursor(xPos, yStart + 8);
             display.print(paramNames[i]);
         }
     }
-    
+
     // Compact instructions at bottom
     display.setCursor(2, 56);
     display.print("9-14:TOG *=EDITING 8:BACK");
-    
+
     display.display();
 }
 
-void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Sequencer& seq2) {
+void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Sequencer& seq2, const Sequencer& seq3, const Sequencer& seq4) {
     // Call the overloaded version with nullptr for voiceManager
-    update(uiState, seq1, seq2, nullptr);
+    update(uiState, seq1, seq2, seq3, seq4, nullptr);
 }
 
-void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Sequencer& seq2, VoiceManager* voiceManager) {
+void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Sequencer& seq2, const Sequencer& seq3, const Sequencer& seq4, VoiceManager* voiceManager) {
     if (!initialized) return;
 
     // Store voice manager reference for immediate updates
@@ -182,7 +188,7 @@ void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Se
         display.print(uiState.lastVoiceParameterButton);
         display.setCursor(5, 35);
         display.print("Voice: ");
-        display.print(uiState.isVoice2Mode ? "2" : "1");
+        display.print(uiState.selectedVoiceIndex + 1);
         display.display();
         return;
     } else if (uiState.inVoiceParameterMode) {
@@ -194,8 +200,10 @@ void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Se
 
     if (heldParam != nullptr) {
         // Display parameter editing information
-        uint8_t voice = uiState.isVoice2Mode ? 2 : 1;
-        const Sequencer& currentSeq = uiState.isVoice2Mode ? seq2 : seq1;
+        uint8_t voice = uiState.selectedVoiceIndex + 1;
+        const Sequencer& currentSeq = (uiState.selectedVoiceIndex == 0) ? seq1 :
+                                      (uiState.selectedVoiceIndex == 1) ? seq2 :
+                                      (uiState.selectedVoiceIndex == 2) ? seq3 : seq4;
         uint8_t currentStep = currentSeq.getCurrentStepForParameter(heldParam->paramId);
         float currentValue = currentSeq.getStepParameterValue(heldParam->paramId, currentStep);
         displayParameterInfo(heldParam->name, currentValue, voice, currentStep);
@@ -203,10 +211,12 @@ void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Se
         // Step editing mode - show step parameter values
         if (uiState.currentEditParameter != ParamId::Count) {
             // Display the currently editing parameter for the selected step
-            uint8_t voice = uiState.isVoice2Mode ? 2 : 1;
-            const Sequencer& currentSeq = uiState.isVoice2Mode ? seq2 : seq1;
+            uint8_t voice = uiState.selectedVoiceIndex + 1;
+            const Sequencer& currentSeq = (uiState.selectedVoiceIndex == 0) ? seq1 :
+                                          (uiState.selectedVoiceIndex == 1) ? seq2 :
+                                          (uiState.selectedVoiceIndex == 2) ? seq3 : seq4;
             float currentValue = currentSeq.getStepParameterValue(uiState.currentEditParameter, uiState.selectedStepForEdit);
-            
+
             // Find parameter name
             const char* paramName = "Unknown";
             for (size_t i = 0; i < PARAM_BUTTON_MAPPINGS_SIZE; ++i) {
@@ -215,7 +225,7 @@ void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Se
                     break;
                 }
             }
-            
+
             displayParameterInfo(paramName, currentValue, voice, uiState.selectedStepForEdit);
         } else {
             // No parameter selected - show step selection prompt
@@ -223,7 +233,7 @@ void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Se
             display.setTextSize(2);
             display.print("Step ");
             display.print(uiState.selectedStepForEdit + 1);
-            
+
             display.setCursor(5, 40);
             display.setTextSize(1);
             display.print("Press param button");
@@ -233,42 +243,42 @@ void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Se
     } else {
         // Default screen: Show current scale and shuffle pattern with enhanced formatting
         display.setTextSize(1);
-        
+
         // Header with title
         display.setCursor(25, 5);
         display.setTextSize(1);
         display.print("Mudras Sequencer");
-        
+
         // Horizontal line under header
         display.drawFastHLine(5, 14, SCREEN_WIDTH - 10, SH110X_WHITE);
-        
-        // Scale section 
-      
+
+        // Scale section
+
         display.setCursor(5, 20);
         display.print("Scale:");
-        
+
         display.setCursor(55, 20);
         display.setTextSize(1);
         display.print(scaleNames[currentScale]);
-        
+
         // Separator line
        // display.drawFastHLine(10, 30, SCREEN_WIDTH - 20, SH110X_WHITE);
-        
+
         // Shuffle section
-     
+
         display.setCursor(5, 36);
         display.print("Shuffle:");
-        
+
         display.setCursor(65, 36);
         display.print(getShuffleTemplateName(uiState.currentShufflePatternIndex));
-        
+
         // Bottom status line
      //   display.drawFastHLine(5, 48, SCREEN_WIDTH - 10, SH110X_WHITE);
         display.setCursor(5, 52);
         display.setTextSize(1);
         display.print("Voice: ");
-        display.print(uiState.isVoice2Mode ? "2" : "1");
-        
+        display.print(uiState.selectedVoiceIndex + 1);
+
         // Current step indicator
         display.setCursor(70, 52);
     }
@@ -300,10 +310,10 @@ void OLEDDisplay::displayParameterInfo(const char* paramName, float currentValue
     // Parameter value
     display.setTextSize(2);
     display.setCursor(5, 32);
-    
+
     // Format the parameter value based on its type
     ParamId paramId = ParamId::Note; // Default
-    
+
     // Find the ParamId based on the parameter name
     for (size_t i = 0; i < PARAM_BUTTON_MAPPINGS_SIZE; ++i) {
         if (strcmp(PARAM_BUTTON_MAPPINGS[i].name, paramName) == 0) {
@@ -311,23 +321,23 @@ void OLEDDisplay::displayParameterInfo(const char* paramName, float currentValue
             break;
         }
     }
-    
+
     String formattedValue = formatParameterValue(paramId, currentValue);
     display.print(formattedValue);
-    
+
     // Progress bar for normalized parameters
-    if (paramId != ParamId::Note && paramId != ParamId::Octave && 
+    if (paramId != ParamId::Note && paramId != ParamId::Octave &&
         paramId != ParamId::Gate && paramId != ParamId::Slide) {
-        
+
         // Draw progress bar
         int barWidth = SCREEN_WIDTH - 10;
         int barHeight = 10;
         int barX = 5;
         int barY = 52;
-        
+
         // Background
         display.drawRect(barX, barY, barWidth, barHeight, SH110X_WHITE);
-        
+
         // Fill based on parameter value (0.0 to 1.0)
         int fillWidth = (int)(currentValue * (barWidth - 4));
         if (fillWidth > 0) {
@@ -340,36 +350,36 @@ String OLEDDisplay::formatParameterValue(ParamId paramId, float value) {
     switch (paramId) {
         case ParamId::Note:
             return String((int)value);
-            
+
         case ParamId::Velocity:
             return String((int)(value * 100)) + "%";
-            
+
         case ParamId::Filter:
         {
             int filterFreq =  daisysp::fmap(value, 100.0f, 6710.0f, daisysp::Mapping::EXP);
             return String((int)(filterFreq)) + "Hz";
         }
-            
+
         case ParamId::Attack:
             return String(value, 3) + "s";
-            
+
         case ParamId::Decay:
             return String(value, 3) + "s";
-            
+
         case ParamId::Octave:
             if (value < 0.15f) return "-1";
             else if (value > 0.4f) return "+1";
             else return "0";
-            
+
         case ParamId::GateLength:
             return String((int)(value * 100)) + "%";
-            
+
         case ParamId::Gate:
             return value > 0.5f ? "ON" : "OFF";
-            
+
         case ParamId::Slide:
             return value > 0.5f ? "ON" : "OFF";
-            
+
         default:
             return String(value, 2);
     }
@@ -377,21 +387,22 @@ String OLEDDisplay::formatParameterValue(ParamId paramId, float value) {
 
 void OLEDDisplay::displaySettingsMenu(const UIState& uiState) {
     display.setTextSize(1);
-    
+
     if (uiState.inPresetSelection) {
         // Enhanced preset selection with cycling interface
-        int currentPresetIndex = (uiState.settingsMenuIndex == 0) ? 
-                               uiState.voice1PresetIndex : uiState.voice2PresetIndex;
-        
+        int currentPresetIndex = (uiState.settingsMenuIndex == 0) ? uiState.voice1PresetIndex :
+                                (uiState.settingsMenuIndex == 1) ? uiState.voice2PresetIndex :
+                                (uiState.settingsMenuIndex == 2) ? uiState.voice3PresetIndex : uiState.voice4PresetIndex;
+
         // Header with voice info
         display.setCursor(5, 5);
         display.print("VOICE ");
         display.print(uiState.settingsMenuIndex + 1);
         display.print(" PRESET");
-        
+
         // Draw separator line
         display.drawFastHLine(5, 14, SCREEN_WIDTH - 10, SH110X_WHITE);
-        
+
         // Current preset - large and centered
         display.setTextSize(2);
         const char* currentPresetName = VoicePresets::getPresetName(currentPresetIndex);
@@ -399,17 +410,17 @@ void OLEDDisplay::displaySettingsMenu(const UIState& uiState) {
         int centerX = (SCREEN_WIDTH - textWidth) / 2;
         display.setCursor(centerX, 20);
         display.print(currentPresetName);
-        
+
         // Navigation indicators
         display.setTextSize(1);
-        
+
         // Previous preset (if available)
         if (currentPresetIndex > 0) {
             display.setCursor(5, 45);
             display.print("< ");
             display.print(VoicePresets::getPresetName(currentPresetIndex - 1));
         }
-        
+
         // Next preset (if available)
         if (currentPresetIndex < VoicePresets::getPresetCount() - 1) {
             const char* nextPresetName = VoicePresets::getPresetName(currentPresetIndex + 1);
@@ -418,93 +429,97 @@ void OLEDDisplay::displaySettingsMenu(const UIState& uiState) {
             display.print(nextPresetName);
             display.print(" >");
         }
-        
+
         // Preset counter at bottom
         display.setCursor(5, 56);
         display.print(currentPresetIndex + 1);
         display.print("/");
         display.print(VoicePresets::getPresetCount());
-        
+
         // Instructions
         display.setCursor(SCREEN_WIDTH - 84, 56); // Right-aligned
         display.print("BTN1-6:SEL BTN8:OK");
-        
+
     } else {
         // Enhanced main settings menu
         display.setCursor(5, 5);
         display.setTextSize(1);
         display.print("SETTINGS MENU");
-        
+
         // Draw separator line
         display.drawFastHLine(5, 14, SCREEN_WIDTH - 10, SH110X_WHITE);
-        
-        // Voice configurations with better visual hierarchy
-        for (int i = 0; i < 2; i++) {
-            int yPos = 20 + (i * 20);
-            
+
+        // Voice configurations with better visual hierarchy (4 voices)
+        for (int i = 0; i < 4; i++) {
+            int yPos = 20 + (i * 10);
+
             // Selection indicator
             if (uiState.settingsMenuIndex == i) {
                 // Draw selection box
-                display.drawRect(2, yPos - 2, SCREEN_WIDTH - 4, 18, SH110X_WHITE);
+                display.drawRect(2, yPos - 2, SCREEN_WIDTH - 4, 9, SH110X_WHITE);
                 display.setCursor(5, yPos);
                 display.print("> ");
             } else {
                 display.setCursor(5, yPos);
                 display.print("  ");
             }
-            
+
             // Voice label
             display.print("VOICE ");
             display.print(i + 1);
-            
+
             // Current preset name
-            display.setCursor(5, yPos + 8);
-            const char* presetName = (i == 0) ? 
-                VoicePresets::getPresetName(uiState.voice1PresetIndex) :
-                VoicePresets::getPresetName(uiState.voice2PresetIndex);
+            display.setCursor(58, yPos);
+            const char* presetName = (i == 0) ? VoicePresets::getPresetName(uiState.voice1PresetIndex) :
+                                     (i == 1) ? VoicePresets::getPresetName(uiState.voice2PresetIndex) :
+                                     (i == 2) ? VoicePresets::getPresetName(uiState.voice3PresetIndex) :
+                                                VoicePresets::getPresetName(uiState.voice4PresetIndex);
             display.print("Preset: ");
             display.print(presetName);
         }
-        
+
         // Instructions at bottom
         display.setCursor(5, 56);
         display.print("B 1-2:SEL  B 8:EDIT  B 9-24:PARAMS");
     }
 }
 
-void OLEDDisplay::displayVoiceParameterInfo(const UIState& uiState, VoiceManager* voiceManager, 
+void OLEDDisplay::displayVoiceParameterInfo(const UIState& uiState, VoiceManager* voiceManager,
                                            uint8_t leadVoiceId, uint8_t bassVoiceId) {
     if (!initialized || !voiceManager) return;
-    
+
     display.clearDisplay();
     display.setTextSize(1);
     display.setTextColor(SH110X_WHITE);
-    
+
     // Get current voice configuration
-    uint8_t currentVoiceId = uiState.isVoice2Mode ? bassVoiceId : leadVoiceId;
+    extern uint8_t voice3Id;
+    extern uint8_t voice4Id;
+    uint8_t selected = uiState.selectedVoiceIndex;
+    uint8_t currentVoiceId = (selected == 0) ? leadVoiceId : (selected == 1) ? bassVoiceId : (selected == 2) ? voice3Id : voice4Id;
     VoiceConfig* config = voiceManager->getVoiceConfig(currentVoiceId);
-    
+
     if (!config) {
         display.setCursor(5, 20);
         display.print("Voice config error");
         display.display();
         return;
     }
-    
+
     // Header
     display.setCursor(5, 5);
     display.setTextSize(1);
     display.print("VOICE ");
-    display.print(uiState.isVoice2Mode ? "2" : "1");
+    display.print(selected + 1);
     display.print(" PARAMETERS");
-    
+
     // Draw separator line
     display.drawFastHLine(5, 14, SCREEN_WIDTH - 10, SH110X_WHITE);
-    
+
     // Parameter information based on button pressed
     const char* paramName = "";
     String paramValue = "";
-    
+
     switch (uiState.lastVoiceParameterButton) {
         case 9:
             paramName = "Envelope";
@@ -539,24 +554,24 @@ void OLEDDisplay::displayVoiceParameterInfo(const UIState& uiState, VoiceManager
             paramValue = String(uiState.lastVoiceParameterButton);
             break;
     }
-    
+
     // Display parameter name
     display.setCursor(5, 20);
     display.setTextSize(1);
     display.print(paramName);
     display.print(":");
-    
+
     // Display parameter value
     display.setCursor(5, 35);
     display.setTextSize(2);
     display.print(paramValue);
-    
+
     // Show button number
     display.setTextSize(1);
     display.setCursor(5, 55);
     display.print("Button ");
     display.print(uiState.lastVoiceParameterButton);
-    
+
     display.display();
 }
 
@@ -576,7 +591,7 @@ void OLEDDisplay::forceUpdate(const UIState& uiState, VoiceManager* voiceManager
 
 
     // Force immediate display update for voice parameter changes
-    if (uiState.settingsMode && (uiState.inVoiceParameterMode || 
+    if (uiState.settingsMode && (uiState.inVoiceParameterMode ||
         (uiState.voiceParameterChangeTime > 0 && (millis() - uiState.voiceParameterChangeTime < 5000)))) {
         Serial.println("OLED: Conditions met - updating display");
 
@@ -593,21 +608,21 @@ void OLEDDisplay::forceUpdate(const UIState& uiState, VoiceManager* voiceManager
 void OLEDDisplay::onVoiceParameterChanged(uint8_t voiceId, const VoiceState& state) {
     // This method is called immediately when a voice parameter changes
     // Provides immediate visual feedback with proper voice ID mapping
-    
+
     if (!initialized) {
         Serial.println("OLED: Parameter change ignored - display not initialized");
         return;
     }
-    
+
     if (!voiceManagerRef) {
         Serial.println("OLED: Parameter change ignored - no voice manager reference");
         return;
     }
-    
+
     // Get external voice IDs for proper mapping
     extern uint8_t leadVoiceId;
     extern uint8_t bassVoiceId;
-    
+
     // Determine which voice this corresponds to (Voice 1 or Voice 2)
     uint8_t displayVoiceNumber = 0;
     if (voiceId == leadVoiceId) {
@@ -624,7 +639,7 @@ void OLEDDisplay::onVoiceParameterChanged(uint8_t voiceId, const VoiceState& sta
         Serial.println(")");
         return;
     }
-    
+
     // Comprehensive debug output for troubleshooting
     Serial.println("=== OLED Voice Parameter Change ===");
     Serial.print("Voice ID: ");
@@ -646,7 +661,7 @@ void OLEDDisplay::onVoiceParameterChanged(uint8_t voiceId, const VoiceState& sta
     Serial.print("Bass Voice ID: ");
     Serial.println(bassVoiceId);
     Serial.println("=================================");
-    
+
     // Force immediate display update if we have the voice manager
      // This will trigger the display to show the current parameter states
      if (voiceManagerRef) {
@@ -661,22 +676,25 @@ void OLEDDisplay::onVoiceSwitched(const UIState& uiState, VoiceManager* voiceMan
         Serial.println("OLED: Voice switch ignored - display not initialized");
         return;
     }
-    
+
     if (!voiceManager) {
         Serial.println("OLED: Voice switch ignored - no voice manager");
         return;
     }
-    
+
     // Store voice manager reference
     voiceManagerRef = voiceManager;
-    
+
     // Get external voice IDs for proper mapping
     extern uint8_t leadVoiceId;
     extern uint8_t bassVoiceId;
-    
-    uint8_t currentVoiceId = uiState.isVoice2Mode ? bassVoiceId : leadVoiceId;
-    uint8_t displayVoiceNumber = uiState.isVoice2Mode ? 2 : 1;
-    
+    extern uint8_t voice3Id;
+    extern uint8_t voice4Id;
+
+    uint8_t selected = uiState.selectedVoiceIndex;
+    uint8_t currentVoiceId = (selected == 0) ? leadVoiceId : (selected == 1) ? bassVoiceId : (selected == 2) ? voice3Id : voice4Id;
+    uint8_t displayVoiceNumber = selected + 1;
+
     // Comprehensive debug output for voice switching
     Serial.println("=== OLED Voice Switch (Button 24) ===");
     Serial.print("Switched to Voice: ");
@@ -690,7 +708,7 @@ void OLEDDisplay::onVoiceSwitched(const UIState& uiState, VoiceManager* voiceMan
     Serial.print("Settings Mode: ");
     Serial.println(uiState.settingsMode);
     Serial.println("====================================");
-    
+
     // Force immediate update if in settings mode to show voice parameter toggles
     if (uiState.settingsMode) {
         Serial.println("OLED: Forcing immediate update for voice switch in settings mode");

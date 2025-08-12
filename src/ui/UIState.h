@@ -21,7 +21,9 @@ struct UIState {
     bool delayOn = true;
     bool modGateParamSeqLengthsMode = false;
     bool slideMode = false;
-    bool isVoice2Mode = false;
+    // Selected voice index 0..3 (replaces isVoice2Mode)
+    uint8_t selectedVoiceIndex = 0;
+    bool isVoice2Mode = false; // Legacy flag (kept for compatibility in some code paths)
     int selectedStepForEdit = -1;
     ParamId currentEditParameter = ParamId::Count; // Parameter being edited in toggle mode (Count = none)
     int currentThemeIndex = 0;

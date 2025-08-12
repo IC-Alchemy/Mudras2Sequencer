@@ -15,6 +15,8 @@ void updateStepLEDs(
     LEDMatrix& ledMatrix,
     const Sequencer& seq1,
     const Sequencer& seq2,
+    const Sequencer& seq3,
+    const Sequencer& seq4,
     const UIState& uiState,
     int mm
 );
@@ -35,7 +37,7 @@ void updateSettingsModeLEDs(LEDMatrix& ledMatrix, const UIState& uiState);
  * Highlights the voice parameter button that was pressed (buttons 9-24)
  * with a visual indication of the parameter state (on/off/value)
  */
-void updateVoiceParameterLEDs(LEDMatrix& ledMatrix, const UIState& uiState, class VoiceManager* voiceManager, uint8_t leadVoiceId, uint8_t bassVoiceId);
+void updateVoiceParameterLEDs(LEDMatrix& ledMatrix, const UIState& uiState);
 
 
 void setStepLedColor(uint8_t step, uint8_t r, uint8_t g, uint8_t b);

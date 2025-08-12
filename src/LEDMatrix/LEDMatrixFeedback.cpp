@@ -114,12 +114,12 @@ CRGB getParameterColor(ParamId param, uint8_t intensity) {
 void addPolyrhythmicOverlay(
     LEDMatrix& ledMatrix,
     const Sequencer& seq,
-    bool isVoice2Mode,
+    bool secondInPair,
     uint8_t intensity = 32
 ) {
     if (!seq.isRunning()) return;
 
-    const int baseOffset = isVoice2Mode ? ledOffset : 0;
+    const int baseOffset = secondInPair ? ledOffset : 0;
     constexpr size_t NUM_PARAMS = 3;
 
     // Define parameter/color pairs for overlay
@@ -148,8 +148,8 @@ void addPolyrhythmicOverlay(
             // Calculate LED coordinates
             // Calculate LED coordinates from linear paramStep index
             const int x = paramStep % LEDMatrix::WIDTH;
-            // Row index, shifted down by 3 if isVoice2Mode is active
-            const int y = paramStep / LEDMatrix::WIDTH + (isVoice2Mode ? 3 : 0);
+            // Row index, shifted down by 3 if secondInPair (bottom row) is active
+            const int y = paramStep / LEDMatrix::WIDTH + (secondInPair ? 3 : 0);
 
             ledMatrix.setLED(x, y, blendedColor);
         }
@@ -179,7 +179,7 @@ void setupLEDMatrixFeedback() {
 
 /**
  * @brief Updates LED matrix to show settings mode interface
- * 
+ *
  * Displays menu options and preset selections using step LEDs:
  * - Main menu: Shows Voice 1 and Voice 2 options (steps 0-1)
  * - Preset selection: Shows available presets (steps 0-5 for 6 presets)
@@ -187,30 +187,30 @@ void setupLEDMatrixFeedback() {
  */
 void updateSettingsModeLEDs(LEDMatrix& ledMatrix, const UIState& uiState) {
     const LEDThemeColors* activeThemeColors = getActiveThemeColors();
-    
+
     // Clear all LEDs first
     for (int i = 0; i < LEDMatrix::WIDTH * LEDMatrix::HEIGHT; ++i) {
         ledMatrix.getLeds()[i] = CRGB::Black;
     }
-    
+
     if (uiState.inPresetSelection) {
         // Preset selection mode - show available presets
         const uint8_t presetCount = 6; // VoicePresets::getPresetCount() returns 6
-        
+
         // Define preset colors based on voice being configured
-        CRGB selectedColor = (uiState.settingsMenuIndex == 0) ? 
+        CRGB selectedColor = (uiState.settingsMenuIndex == 0) ?
             activeThemeColors->gateOnV1 : activeThemeColors->gateOnV2;
-        CRGB availableColor = (uiState.settingsMenuIndex == 0) ? 
+        CRGB availableColor = (uiState.settingsMenuIndex == 0) ?
             activeThemeColors->gateOffV1 : activeThemeColors->gateOffV2;
-        
+
         // Show presets in first 6 step positions (0-5)
         for (uint8_t i = 0; i < presetCount && i < 16; i++) {
             CRGB color;
-            
+
             // Highlight currently selected preset
-            uint8_t currentPresetIndex = (uiState.settingsMenuIndex == 0) ? 
+            uint8_t currentPresetIndex = (uiState.settingsMenuIndex == 0) ?
                 uiState.voice1PresetIndex : uiState.voice2PresetIndex;
-            
+
             if (i == currentPresetIndex) {
                 // Current preset - bright pulsing
                 uint32_t time = millis();
@@ -222,27 +222,27 @@ void updateSettingsModeLEDs(LEDMatrix& ledMatrix, const UIState& uiState) {
                 color = availableColor;
                 color.nscale8(64);
             }
-            
+
             // Calculate LED position
             int x = i % LEDMatrix::WIDTH;
             int y = i / LEDMatrix::WIDTH;
             ledMatrix.setLED(x, y, color);
         }
-        
+
         // Show which voice is being configured in bottom row
         if (uiState.settingsMenuIndex == 0) {
             // Voice 1 indicator
             ledMatrix.setLED(0, 7, activeThemeColors->gateOnV1);
         } else {
-            // Voice 2 indicator  
+            // Voice 2 indicator
             ledMatrix.setLED(1, 7, activeThemeColors->gateOnV2);
         }
-        
+
     } else {
         // Main settings menu - show Voice 1 and Voice 2 options
-        
+
         // Voice 1 option (step 0)
-        CRGB voice1Color = (uiState.settingsMenuIndex == 0) ? 
+        CRGB voice1Color = (uiState.settingsMenuIndex == 0) ?
             activeThemeColors->gateOnV1 : activeThemeColors->gateOffV1;
         if (uiState.settingsMenuIndex == 0) {
             // Add pulsing effect for selected option
@@ -253,9 +253,9 @@ void updateSettingsModeLEDs(LEDMatrix& ledMatrix, const UIState& uiState) {
             voice1Color.nscale8(96);
         }
         ledMatrix.setLED(0, 0, voice1Color);
-        
+
         // Voice 2 option (step 1)
-        CRGB voice2Color = (uiState.settingsMenuIndex == 1) ? 
+        CRGB voice2Color = (uiState.settingsMenuIndex == 1) ?
             activeThemeColors->gateOnV2 : activeThemeColors->gateOffV2;
         if (uiState.settingsMenuIndex == 1) {
             // Add pulsing effect for selected option
@@ -271,23 +271,23 @@ void updateSettingsModeLEDs(LEDMatrix& ledMatrix, const UIState& uiState) {
 
 void updateVoiceParameterLEDs(LEDMatrix& ledMatrix, const UIState& uiState) {
     if (!uiState.inVoiceParameterMode) return;
-    
+
     // Get active theme colors
     const LEDThemeColors* activeThemeColors = getActiveThemeColors();
     if (!activeThemeColors) return;
-    
+
     // Clear all LEDs first
     for (int i = 0; i < LEDMatrix::WIDTH * LEDMatrix::HEIGHT; i++) {
         ledMatrix.setLED(i % LEDMatrix::WIDTH, i / LEDMatrix::WIDTH, CRGB::Black);
     }
-    
+
     // Map button index to LED position (buttons 9-24 map to steps 8-23)
     uint8_t ledIndex = uiState.lastVoiceParameterButton - 1;
     if (ledIndex >= LEDMatrix::WIDTH * LEDMatrix::HEIGHT) return;
-    
+
     // Choose color based on voice and parameter type
     CRGB paramColor;
-    
+
     switch (uiState.lastVoiceParameterButton) {
         case 9:  // Envelope
             paramColor = uiState.isVoice2Mode ? activeThemeColors->modAttackActive : activeThemeColors->modDecayActive;
@@ -308,7 +308,7 @@ void updateVoiceParameterLEDs(LEDMatrix& ledMatrix, const UIState& uiState) {
             paramColor = uiState.isVoice2Mode ? activeThemeColors->defaultActive : activeThemeColors->defaultInactive;
             break;
     }
-    
+
     // Create pulsing effect for 3 seconds
     if (millis() - uiState.voiceParameterChangeTime < 3000) {
         uint32_t time = millis();
@@ -317,7 +317,7 @@ void updateVoiceParameterLEDs(LEDMatrix& ledMatrix, const UIState& uiState) {
     } else {
         paramColor.nscale8(64); // Dim after timeout
     }
-    
+
     // Set the LED for the voice parameter button
     ledMatrix.setLED(ledIndex % LEDMatrix::WIDTH, ledIndex / LEDMatrix::WIDTH, paramColor);
 }
@@ -341,6 +341,35 @@ void updateVoiceParameterLEDs(LEDMatrix& ledMatrix, const UIState& uiState) {
  * @param seq2      Reference to the second Sequencer (Voice 2).
  * @param uiState   Reference to the UIState struct containing UI and mode flags.
  */
+// Render a voice pair (1/2) or (3/4) into the matrix
+static void renderVoicePair(
+    LEDMatrix& ledMatrix,
+    const Sequencer& a,
+    const Sequencer& b,
+    const LEDThemeColors* theme,
+    int baseOffset
+) {
+    for (int step = 0; step < 16; ++step) {
+        // Top row voice
+        const Step& sa = a.getStep(step);
+        bool phA = (a.getCurrentStepForParameter(ParamId::Gate) == step && a.isRunning());
+        CRGB colorA = sa.gate ? theme->gateOnV1 : theme->gateOffV1;
+        if (a.getStepParameterValue(ParamId::Slide, step) > 0) { nblend(colorA, theme->modSlideActive, 128); }
+        if (phA) { colorA += theme->playheadAccent; }
+        nblend(smoothedTargetColors[step + baseOffset], colorA, TARGET_SMOOTHING_BLEND_AMOUNT);
+        nblend(ledMatrix.getLeds()[step + baseOffset], smoothedTargetColors[step + baseOffset], 166);
+
+        // Bottom row voice
+        const Step& sb = b.getStep(step);
+        bool phB = (b.getCurrentStepForParameter(ParamId::Gate) == step && b.isRunning());
+        CRGB colorB = sb.gate ? theme->gateOnV2 : theme->gateOffV2;
+        if (b.getStepParameterValue(ParamId::Slide, step) > 0) { nblend(colorB, theme->modSlideActive, 128); }
+        if (phB) { colorB += theme->playheadAccent; }
+        int ledIndex = baseOffset + ledOffset + step;
+        nblend(smoothedTargetColors[ledIndex], colorB, TARGET_SMOOTHING_BLEND_AMOUNT);
+        nblend(ledMatrix.getLeds()[ledIndex], smoothedTargetColors[ledIndex], 166);
+    }
+}
 void updateGateLEDs(
     LEDMatrix& ledMatrix,
     const Sequencer& seq1,
@@ -417,6 +446,8 @@ void updateStepLEDs(
     LEDMatrix& ledMatrix,
     const Sequencer& seq1,
     const Sequencer& seq2,
+    const Sequencer& seq3,
+    const Sequencer& seq4,
     const UIState& uiState,
     int mm
 ) {
@@ -425,7 +456,7 @@ void updateStepLEDs(
         updateSettingsModeLEDs(ledMatrix, uiState);
         return;
     }
-    
+
     // Handle voice parameter mode LED feedback
     if (uiState.inVoiceParameterMode && (millis() - uiState.voiceParameterChangeTime < 3000)) {
         updateVoiceParameterLEDs(ledMatrix, uiState);
@@ -437,7 +468,11 @@ void updateStepLEDs(
     ParamId activeParamIdForLength = anyParamForLengthHeld ? heldMapping->paramId : ParamId::Count;
 
     if (uiState.slideMode) {
-        const Sequencer& activeSeq = uiState.isVoice2Mode ? seq2 : seq1;
+        // Select sequencer based on selectedVoiceIndex (0..3)
+        const Sequencer* seqPtr = (uiState.selectedVoiceIndex == 0) ? &seq1 :
+                                  (uiState.selectedVoiceIndex == 1) ? &seq2 :
+                                  (uiState.selectedVoiceIndex == 2) ? &seq3 : &seq4;
+        const Sequencer& activeSeq = *seqPtr;
         uint8_t slidePlayhead = activeSeq.getCurrentStepForParameter(ParamId::Slide);
         uint8_t slideLength = activeSeq.getParameterStepCount(ParamId::Slide);
 
@@ -462,8 +497,9 @@ void updateStepLEDs(
 
             int x = step % LEDMatrix::WIDTH;
             int y = step / LEDMatrix::WIDTH;
-            if (uiState.isVoice2Mode) {
-                y += 3;
+            // Place on top/bottom half based on voice within pair (0/1 top, 2/3 page uses same rows)
+            if ((uiState.selectedVoiceIndex % 2) == 1) {
+                y += 3; // second voice in pair uses lower band
             }
             ledMatrix.setLED(x, y, color);
         }
@@ -472,111 +508,113 @@ void updateStepLEDs(
 
     bool paramValueEditActive = isAnyParameterButtonHeld(uiState);
 
-    if (paramValueEditActive && !uiState.isVoice2Mode) {
-        uint8_t currentLength = seq1.getParameterStepCount(activeParamIdForLength);
-        uint8_t paramPlayhead = seq1.getCurrentStepForParameter(activeParamIdForLength);
+    // Helper to fetch by selected voice
+    auto& activeSeqRef = (uiState.selectedVoiceIndex == 0) ? seq1 :
+                         (uiState.selectedVoiceIndex == 1) ? seq2 :
+                         (uiState.selectedVoiceIndex == 2) ? seq3 : seq4;
 
+    if (paramValueEditActive) {
+        uint8_t currentLength = activeSeqRef.getParameterStepCount(activeParamIdForLength);
+        uint8_t paramPlayhead = activeSeqRef.getCurrentStepForParameter(activeParamIdForLength);
+
+        // Dim the non-selected row (top or bottom) in the current page
+        bool isSecondInPair = (uiState.selectedVoiceIndex % 2) == 1;
+        for (int step = 0; step < 16; ++step) {
+            int topIndex = step;
+            int bottomIndex = ledOffset + step;
+            if (!isSecondInPair) {
+                // Selected voice is top row; dim bottom
+                nblend(smoothedTargetColors[bottomIndex], CRGB::Black, TARGET_SMOOTHING_BLEND_AMOUNT);
+                nblend(ledMatrix.getLeds()[bottomIndex], smoothedTargetColors[bottomIndex], 32);
+            } else {
+                // Selected voice is bottom row; dim top
+                nblend(smoothedTargetColors[topIndex], CRGB::Black, TARGET_SMOOTHING_BLEND_AMOUNT);
+                nblend(ledMatrix.getLeds()[topIndex], smoothedTargetColors[topIndex], 32);
+            }
+        }
+
+        // Paint the selected row with parameter length/playhead info
         for (int step = 0; step < 16; ++step) {
             CRGB targetColor;
             if (step < currentLength) {
-                if (step == paramPlayhead && seq1.isRunning()) {
+                if (step == paramPlayhead && activeSeqRef.isRunning()) {
                     targetColor = getParameterColor(activeParamIdForLength, 180);
                 } else {
-                    targetColor = activeThemeColors->editModeDimBlueV1;
+                    // Use V1 tint for top row, V2 tint for bottom row
+                    targetColor = isSecondInPair ? activeThemeColors->editModeDimBlueV2
+                                                 : activeThemeColors->editModeDimBlueV1;
                 }
             } else {
                 targetColor = CRGB::Black;
             }
-            nblend(smoothedTargetColors[step], targetColor, TARGET_SMOOTHING_BLEND_AMOUNT);
-            nblend(ledMatrix.getLeds()[step], smoothedTargetColors[step], 64);
-        }
-
-        for (int step = 0; step < 16; ++step) {
-            int ledIndex = ledOffset + step;
-            nblend(smoothedTargetColors[ledIndex], CRGB::Black, TARGET_SMOOTHING_BLEND_AMOUNT);
-            nblend(ledMatrix.getLeds()[ledIndex], smoothedTargetColors[ledIndex], 32);
+            int ledIndex = (isSecondInPair ? ledOffset : 0) + step;
+            nblend(smoothedTargetColors[ledIndex], targetColor, TARGET_SMOOTHING_BLEND_AMOUNT);
+            nblend(ledMatrix.getLeds()[ledIndex], smoothedTargetColors[ledIndex], isSecondInPair ? 122 : 64);
         }
 
         return;
     }
-    if (paramValueEditActive && uiState.isVoice2Mode) {
-        uint8_t currentLength = seq2.getParameterStepCount(activeParamIdForLength);
-        uint8_t paramPlayhead = seq2.getCurrentStepForParameter(activeParamIdForLength);
 
-        for (int step = 0; step < 16; ++step) {
-            nblend(smoothedTargetColors[step], CRGB::Black, TARGET_SMOOTHING_BLEND_AMOUNT);
-            nblend(ledMatrix.getLeds()[step], smoothedTargetColors[step], 32);
-        }
+    if (anyParamForLengthHeld) {
+        uint8_t currentLength = activeSeqRef.getParameterStepCount(activeParamIdForLength);
+        uint8_t paramPlayhead = activeSeqRef.getCurrentStepForParameter(activeParamIdForLength);
 
-        for (int step = 0; step < 16; ++step) {
-            CRGB targetColor;
-            if (step < currentLength) {
-                if (step == paramPlayhead && seq2.isRunning()) {
-                    targetColor = getParameterColor(activeParamIdForLength, 180);
-                } else {
-                    targetColor = activeThemeColors->editModeDimBlueV2;
-                }
-            } else {
-                targetColor = CRGB::Black;
-            }
-            int ledIndex = ledOffset + step;
+        // Paint only the selected row’s within-length area
+        bool isSecondInPair = (uiState.selectedVoiceIndex % 2) == 1;
+        for (int step = 0; step < currentLength; ++step) {
+            CRGB targetColor = (step == paramPlayhead && activeSeqRef.isRunning())
+                                   ? getParameterColor(activeParamIdForLength, 180)
+                                   : (isSecondInPair ? activeThemeColors->editModeDimBlueV2
+                                                     : activeThemeColors->editModeDimBlueV1);
+            int ledIndex = (isSecondInPair ? ledOffset : 0) + step;
             nblend(smoothedTargetColors[ledIndex], targetColor, TARGET_SMOOTHING_BLEND_AMOUNT);
-            nblend(ledMatrix.getLeds()[ledIndex], smoothedTargetColors[ledIndex], 122);
+            nblend(ledMatrix.getLeds()[ledIndex], smoothedTargetColors[ledIndex], isSecondInPair ? 200 : 60);
         }
-        return;
-    }
 
-    if (!uiState.isVoice2Mode && anyParamForLengthHeld) {
-        uint8_t currentLength = seq1.getParameterStepCount(activeParamIdForLength);
-        uint8_t paramPlayhead = seq1.getCurrentStepForParameter(activeParamIdForLength);
+        // Dim the other row’s within-length area
         for (int step = 0; step < currentLength; ++step) {
-            CRGB targetColor;
-            if (step < currentLength) {
-                if (step == paramPlayhead && seq1.isRunning()) {
-                    targetColor = getParameterColor(activeParamIdForLength, 180);
-                } else {
-                    targetColor = activeThemeColors->editModeDimBlueV1;
-                }
-            } else {
-                targetColor = CRGB::Black;
-            }
-            nblend(smoothedTargetColors[step], targetColor, TARGET_SMOOTHING_BLEND_AMOUNT);
-            nblend(ledMatrix.getLeds()[step], smoothedTargetColors[step], 60);
-        }
-        for (int step = 0; step < currentLength; ++step) {
-            nblend(smoothedTargetColors[ledOffset + step], CRGB::Black, TARGET_SMOOTHING_BLEND_AMOUNT);
-            nblend(ledMatrix.getLeds()[ledOffset + step], smoothedTargetColors[ledOffset + step], 150);
-        }
-    } else if (uiState.isVoice2Mode && anyParamForLengthHeld) {
-        uint8_t currentLength = seq2.getParameterStepCount(activeParamIdForLength);
-        uint8_t paramPlayhead = seq2.getCurrentStepForParameter(activeParamIdForLength);
-        for (int step = 0; step < currentLength; ++step) {
-            nblend(smoothedTargetColors[step], CRGB::Black, TARGET_SMOOTHING_BLEND_AMOUNT);
-            nblend(ledMatrix.getLeds()[step], smoothedTargetColors[step], 200);
-        }
-        for (int step = 0; step < currentLength; ++step) {
-            CRGB targetColor;
-            if (step < currentLength) {
-                if (step == paramPlayhead && seq2.isRunning()) {
-                    targetColor = getParameterColor(activeParamIdForLength, 180);
-                } else {
-                    targetColor = activeThemeColors->editModeDimBlueV2;
-                }
-            } else {
-                targetColor = CRGB::Black;
-            }
-            int ledIndex = ledOffset + step;
-            nblend(smoothedTargetColors[ledIndex], targetColor, TARGET_SMOOTHING_BLEND_AMOUNT);
-            nblend(ledMatrix.getLeds()[ledIndex], smoothedTargetColors[ledIndex], 200);
+            int otherIndex = (isSecondInPair ? 0 : ledOffset) + step;
+            nblend(smoothedTargetColors[otherIndex], CRGB::Black, TARGET_SMOOTHING_BLEND_AMOUNT);
+            nblend(ledMatrix.getLeds()[otherIndex], smoothedTargetColors[otherIndex], 150);
         }
     } else {
-        updateGateLEDs(ledMatrix, seq1, seq2, uiState);
+        // Determine which voice pair to display based on selectedVoiceIndex
+        bool showFirstPair = (uiState.selectedVoiceIndex < 2);
+        bool secondInPair = (uiState.selectedVoiceIndex % 2) == 1;
+        const LEDThemeColors* theme = getActiveThemeColors();
 
-        addPolyrhythmicOverlay(ledMatrix, seq1, false, 32);
-        addPolyrhythmicOverlay(ledMatrix, seq2, true, 32);
+        // Clear first to avoid ghosting when switching pages
+        for (int i = 0; i < LEDMatrix::WIDTH * LEDMatrix::HEIGHT; ++i) {
+            nblend(smoothedTargetColors[i], CRGB::Black, TARGET_SMOOTHING_BLEND_AMOUNT);
+            nblend(ledMatrix.getLeds()[i], smoothedTargetColors[i], 64);
+        }
 
+        // Render either voices 1/2 (page 1) or 3/4 (page 2)
+        if (showFirstPair) {
+            renderVoicePair(ledMatrix, seq1, seq2, theme, 0);
+        } else {
+            renderVoicePair(ledMatrix, seq3, seq4, theme, 0);
+        }
+
+        // Polyrhythmic overlays for the visible pair only
+        if (showFirstPair) {
+            addPolyrhythmicOverlay(ledMatrix, seq1, false, 32);
+            addPolyrhythmicOverlay(ledMatrix, seq2, true, 32);
+        } else {
+            addPolyrhythmicOverlay(ledMatrix, seq3, false, 32);
+            addPolyrhythmicOverlay(ledMatrix, seq4, true, 32);
+        }
+
+        // Corner indicator for page: top-left = page1 (1/2), top-right = page2 (3/4)
+        if (showFirstPair) {
+            ledMatrix.setLED(0, 0, CRGB(0, 15, 0)); // small green dot
+        } else {
+            ledMatrix.setLED(LEDMatrix::WIDTH - 1, 0, CRGB(0, 15, 15)); // cyan dot
+        }
+
+        // Highlight selected step if editing
         if (uiState.selectedStepForEdit >= 0 && uiState.selectedStepForEdit < 16) {
-            int ledIndex = uiState.isVoice2Mode ? (ledOffset + uiState.selectedStepForEdit) : uiState.selectedStepForEdit;
+            int ledIndex = uiState.selectedVoiceIndex % 2 == 1 ? (ledOffset + uiState.selectedStepForEdit) : uiState.selectedStepForEdit;
 
             static bool blinkState = false;
             static uint32_t lastBlinkTime = 0;

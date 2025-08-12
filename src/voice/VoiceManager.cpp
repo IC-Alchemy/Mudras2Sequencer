@@ -466,11 +466,12 @@ uint8_t VoiceManager::getVoiceOutput(uint8_t voiceId) const {
 std::vector<std::string> VoiceManager::getAvailablePresets() {
     return {
         "analog",
-        "digital", 
+        "digital",
         "bass",
         "lead",
         "pad",
-        "percussion"
+        "percussion",
+        "particle"
     };
 }
 
@@ -497,6 +498,8 @@ VoiceConfig VoiceManager::getPresetConfig(const std::string& presetName) {
         return VoicePresets::getPadVoice();
     } else if (presetName == "percussion") {
         return VoicePresets::getPercussionVoice();
+    } else if (presetName == "particle") {
+        return VoicePresets::getParticleVoice();
     } else {
         // Default to analog voice if preset not found
         return VoicePresets::getAnalogVoice();

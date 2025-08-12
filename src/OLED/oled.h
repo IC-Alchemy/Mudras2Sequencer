@@ -53,7 +53,7 @@ public:
      * @param seq1 Sequencer 1 reference for parameter values
      * @param seq2 Sequencer 2 reference for parameter values
      */
-    void update(const UIState& uiState, const Sequencer& seq1, const Sequencer& seq2);
+    void update(const UIState& uiState, const Sequencer& seq1, const Sequencer& seq2, const Sequencer& seq3, const Sequencer& seq4);
     
     /**
      * @brief Update the display with voice manager access for settings mode
@@ -62,7 +62,7 @@ public:
      * @param seq2 Sequencer 2 reference for parameter values
      * @param voiceManager Pointer to voice manager for accessing voice configs
      */
-    void update(const UIState& uiState, const Sequencer& seq1, const Sequencer& seq2, class VoiceManager* voiceManager);
+    void update(const UIState& uiState, const Sequencer& seq1, const Sequencer& seq2, const Sequencer& seq3, const Sequencer& seq4, class VoiceManager* voiceManager);
     
     /**
      * @brief Clear the display
