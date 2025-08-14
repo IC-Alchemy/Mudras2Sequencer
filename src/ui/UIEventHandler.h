@@ -29,6 +29,8 @@ constexpr uint8_t BUTTON_CHANGE_THEME = 28;
 constexpr uint8_t BUTTON_CHANGE_SWING_PATTERN = 29;
 constexpr uint8_t BUTTON_RANDOMIZE_SEQ1 = 30;
 constexpr uint8_t BUTTON_RANDOMIZE_SEQ2 = 31;
+constexpr uint8_t BUTTON_RANDOMIZE_SEQ3 = 32;
+constexpr uint8_t BUTTON_RANDOMIZE_SEQ4 = 33;
 
 constexpr uint8_t NUMBER_OF_STEP_BUTTONS = 16;
 constexpr unsigned long AS5600_DOUBLE_PRESS_WINDOW = 300; // ms

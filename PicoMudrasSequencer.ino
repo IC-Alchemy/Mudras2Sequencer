@@ -2,6 +2,8 @@
 #include "diagnostic.h"
 #include "src/dsp/dsp.h"
 #include "src/voice/Voice.h"
+#include "src/utils/Debug.h"
+
 
 // =======================
 //   GLOBAL VARIABLES
@@ -142,8 +144,11 @@ void onClockStart()
 {
     Serial.println("[uClock] onClockStart()");
     usb_midi.sendRealTime(midi::Start);
+    // Start all four sequencers so LEDs and audio advance for 3/4 as well
     seq1.start();
     seq2.start();
+    seq3.start();
+    seq4.start();
     isClockRunning = true;
     unmuteOscillators();
 }
@@ -152,15 +157,17 @@ void onClockStop()
 {
     Serial.println("[uClock] onClockStop()");
     usb_midi.sendRealTime(midi::Stop);
+    // Stop all four sequencers
     seq1.stop();
     seq2.stop();
+    seq3.stop();
+    seq4.stop();
 
     // Use MidiNoteManager for comprehensive cleanup
     midiNoteManager.onSequencerStop();
 
-
     // Legacy allNotesOff() call for sequencer state cleanup
-muteOscillators();
+    muteOscillators();
     isClockRunning = false;
 }
 
@@ -515,14 +522,32 @@ void updateActiveVoiceState(uint8_t stepIndex, Sequencer &activeSeq)
         return;
     }
 
-     VoiceState *activeVoiceState = uiState.isVoice2Mode ? &voiceState2 : &voiceState1;
+    // Determine currently selected voice (1-4)
+    uint8_t selectedIndex = uiState.selectedVoiceIndex; // 0..3
+    uint8_t voiceNumber = selectedIndex + 1;            // 1..4
+
+    // Pick the matching VoiceState for the selected voice
+    VoiceState *activeVoiceState = nullptr;
+    switch (voiceNumber)
+    {
+        case 1: activeVoiceState = &voiceState1; break;
+        case 2: activeVoiceState = &voiceState2; break;
+        case 3: activeVoiceState = &voiceState3; break;
+        case 4: activeVoiceState = &voiceState4; break;
+        default: return; // Invalid
+    }
 
     // Update voice state with new step parameters + AS5600 encoder modifications
     activeSeq.playStepNow(stepIndex, activeVoiceState);
-    applyAS5600BaseValues(activeVoiceState, uiState.isVoice2Mode ? 1 : 0);
 
-    // Update synth hardware for immediate audio feedback using the unified function
-    updateVoiceParameters(*activeVoiceState, uiState.isVoice2Mode);
+    // Apply AS5600 base values only for voices 1/2 (no mapping for 3/4 by design)
+    if (voiceNumber == 1 || voiceNumber == 2)
+    {
+        applyAS5600BaseValues(activeVoiceState, (voiceNumber == 2) ? 1 : 0);
+    }
+
+    // Update synth hardware for immediate audio feedback using the per-voice function
+    updateVoiceParametersForVoice(*activeVoiceState, voiceNumber);
 
     Serial.print("Applied immediate voice updates for step ");
     Serial.println(stepIndex);
@@ -539,10 +564,11 @@ void onStepCallback(uint32_t uClockCurrentStep)
     // Extend to four voices; distance sensor assigned to currently selected voice only
     VoiceState tempState1, tempState2, tempState3, tempState4;
 
-    int v1Distance = (uiState.isVoice2Mode ? -1 : mm); // Legacy control: voice1 when in voice1 mode
-    int v2Distance = (uiState.isVoice2Mode ? mm : -1); // Legacy control: voice2 when in voice2 mode
-    int v3Distance = -1; // No distance sensor mapped by default
-    int v4Distance = -1; // No distance sensor mapped by default
+    // Route distance sensor to the currently selected voice (1..4); others disabled (-1)
+    int v1Distance = (uiState.selectedVoiceIndex == 0) ? mm : -1;
+    int v2Distance = (uiState.selectedVoiceIndex == 1) ? mm : -1;
+    int v3Distance = (uiState.selectedVoiceIndex == 2) ? mm : -1;
+    int v4Distance = (uiState.selectedVoiceIndex == 3) ? mm : -1;
 
     seq1.advanceStep(uClockCurrentStep, v1Distance, uiState, &tempState1);
     seq2.advanceStep(uClockCurrentStep, v2Distance, uiState, &tempState2);
@@ -674,6 +700,11 @@ void setup1()
 
    Serial.begin(115200);
 
+   // Initialize lightweight debug system
+   Debug::begin(115200);
+   Debug::setEnabled(true);
+   Debug::setLevel(Debug::Level::Info);
+
   Serial.print("[CORE1] Setup starting... ");
 
     randomSeed(analogRead(A0) + millis());
@@ -792,6 +823,17 @@ void loop()
         fill_audio_buffer(buf);
         give_audio_buffer(producer_pool, buf);
     }
+    // Optional runtime toggle via simple Serial commands (non-blocking pattern)
+    if (Serial.available()) {
+        int c = Serial.read();
+        if (c == 'd') { Debug::setEnabled(true); Serial.println("[Debug] Enabled"); }
+        else if (c == 'D') { Debug::setEnabled(false); Serial.println("[Debug] Disabled"); }
+        else if (c == '1') { Debug::setLevel(Debug::Level::Error); Serial.println("[Debug] Level=Error"); }
+        else if (c == '2') { Debug::setLevel(Debug::Level::Warn); Serial.println("[Debug] Level=Warn"); }
+        else if (c == '3') { Debug::setLevel(Debug::Level::Info); Serial.println("[Debug] Level=Info"); }
+        else if (c == '4') { Debug::setLevel(Debug::Level::Verbose); Serial.println("[Debug] Level=Verbose"); }
+    }
+
 }
 
 // --- Optimized LED and UI Update Loop (Core1) ---

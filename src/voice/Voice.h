@@ -230,6 +230,11 @@ private:
     VoiceConfig config;
     float sampleRate;
 
+    // Frequency lookup table for performance optimization
+    // Covers all possible MIDI notes (0-127) to avoid mtof() calculations
+    static float frequencyLookupTable[128];
+    static bool lookupTableInitialized;
+
     // Audio processing components
     std::vector<daisysp::Oscillator> oscillators;
     daisysp::WhiteNoise noise_;
@@ -274,6 +279,9 @@ private:
      * @return float Frequency in Hz
      */
     float calculateNoteFrequency(float note, int8_t octaveOffset, int harmony);
+
+    // Internal helper to initialize frequency lookup table (called once)
+    static void initFrequencyLookupTable();
 
     /**
      * @brief Process frequency slewing for slide functionality

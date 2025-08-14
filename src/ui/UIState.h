@@ -39,12 +39,12 @@ struct UIState {
     bool button24WasPressed = false;
 
     // --- Randomize Button States ---
-    unsigned long randomize1PressTime = 0;
-    bool randomize1WasPressed = false;
-    bool randomize1ResetTriggered = false;
-    unsigned long randomize2PressTime = 0;
-    bool randomize2WasPressed = false;
-    bool randomize2ResetTriggered = false;
+    static constexpr int NUM_RANDOMIZE = 4;
+    unsigned long randomizePressTime[NUM_RANDOMIZE] = {0};
+    bool randomizeWasPressed[NUM_RANDOMIZE] = {false};
+    bool randomizeResetTriggered[NUM_RANDOMIZE] = {false};
+
+
 
     // --- Shuffle State ---
     uint8_t currentShufflePatternIndex = 0;

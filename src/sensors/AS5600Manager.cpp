@@ -153,10 +153,12 @@ void updateAS5600StepParameterValues(UIState& uiState)
         return;
     }
 
-    // Get the active sequencer based on voice mode
-    extern Sequencer seq1, seq2;
-    Sequencer& activeSeq = uiState.isVoice2Mode ? seq2 : seq1;
-    
+    // Get the active sequencer based on selected voice (1..4)
+    extern Sequencer seq1, seq2, seq3, seq4;
+    Sequencer& activeSeq = (uiState.selectedVoiceIndex == 0) ? seq1 :
+                           (uiState.selectedVoiceIndex == 1) ? seq2 :
+                           (uiState.selectedVoiceIndex == 2) ? seq3 : seq4;
+
     // Use the currently selected edit parameter
     ParamId targetParamId = uiState.currentEditParameter;
     if (targetParamId == ParamId::Count)

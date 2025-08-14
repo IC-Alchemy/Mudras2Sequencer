@@ -23,3 +23,5 @@ CONTRIBUTING.md
 docs/ParameterControlEnhancements.md
 src/LEDMatrix/SETTINGS_LED_FEEDBACK.md
 VOICE_EXPANSION_PLAN.md
+src/voice/FREQUENCY_OPTIMIZATION.md
+examples/VoiceSystemIntegration.cpp

@@ -10,10 +10,31 @@ static constexpr float FREQ_SLEW_RATE = 0.00035f; // Slide speed
 static constexpr float BASE_FREQ =
     110.0f; // Base frequency for note calculations
 
+// Static member initialization
+float Voice::frequencyLookupTable[128];
+bool Voice::lookupTableInitialized = false;
+
+// Initialize frequency lookup table covering MIDI 0..127
+void Voice::initFrequencyLookupTable()
+{
+  // Use daisysp::mtof once per MIDI note value
+  for (int midi = 0; midi < 90; ++midi)
+  {
+    frequencyLookupTable[midi] = daisysp::mtof(static_cast<float>(midi));
+  }
+}
+
 Voice::Voice(uint8_t id, const VoiceConfig &cfg)
     : voiceId(id), config(cfg), sampleRate(48000.0f), filterFrequency(1000.0f),
       gate(false)
 {
+  // Initialize frequency lookup table once (thread-safe since all voices share it)
+  if (!lookupTableInitialized)
+  {
+    initFrequencyLookupTable();
+    lookupTableInitialized = true;
+  }
+
   // Initialize oscillators vector
   oscillators.resize(config.oscillatorCount);
 
@@ -29,12 +50,12 @@ Voice::Voice(uint8_t id, const VoiceConfig &cfg)
   state.velocity = 0.8f;
   state.filter = 0.37f;
   state.attack = 0.01f;
-  state.decay = 0.01f;
+  state.decay = 0.1f;
   state.octave = 0;
   state.gate = false;
   state.slide = false;
   state.retrigger = false;
-  state.gateLength = 8; // Default gate length
+  state.gateLength = 27; // Default gate length
 }
 
 void Voice::init(float sr)
@@ -162,8 +183,11 @@ float Voice::process()
 
   if (config.useParticleEngine)
   {
+    config.particleDensity=state.velocity*envelopeValue;
+
     // Particle synthesis path
     mixedOscillators = particle_.Process();
+
   }
   else if (config.oscillatorCount == 0)
   {
@@ -274,14 +298,31 @@ float Voice::process()
       return;
     }
 
-    // Update each oscillator with harmony intervals and detuning
-    for (size_t i = 0; i < oscillators.size() && i < 3; i++)
+    // Calculate base frequency once and cache it (used when harmony offset is 0)
+    const float baseFreq = calculateNoteFrequency(state.note, state.octave, 0);
+
+    // Limit oscillator loop to max 3
+    const size_t oscCount = std::min(static_cast<size_t>(3), oscillators.size());
+
+    for (size_t i = 0; i < oscCount; i++)
     {
       // Calculate frequency for this oscillator using harmony interval
-      float harmonyFreq =
-          calculateNoteFrequency(state.note, state.octave, config.harmony[i]);
-      // Apply TripleSaw-style percentage detuning on top of harmony
-      float targetFreq = harmonyFreq + (0.05f * harmonyFreq * config.oscDetuning[i]);
+      float harmonyFreq;
+      const int harmonyInterval = config.harmony[i];
+
+      if (harmonyInterval == 0)
+      {
+        harmonyFreq = baseFreq;
+      }
+      else
+      {
+        harmonyFreq = calculateNoteFrequency(state.note, state.octave, harmonyInterval);
+      }
+
+      // Apply TripleSaw-style percentage detuning relative to harmony frequency
+      // fmaf(a, b, c) computes a*b + c using a single FPU instruction when available
+      const float targetFreq = std::fmaf(0.05f * config.oscDetuning[i], harmonyFreq, harmonyFreq);
+
       if (state.slide)
       {
         // Set target for slewing
@@ -314,24 +355,25 @@ float Voice::process()
   float Voice::calculateNoteFrequency(float note, int8_t octaveOffset,
                                       int harmony)
   {
-    // Clamp note to valid range
-    int noteIndex =
-        std::max(0, std::min(static_cast<int>(note), 47)); // 48 notes max
+    // Clamp note to valid range with ARM-friendly integer operations
+    const int noteIndex = std::max(0, std::min(static_cast<int>(note), 47));
 
     // Apply harmony interval, ensuring we stay within scale bounds
-    int harmonyNoteIndex = std::max(0, std::min(noteIndex + harmony, 47));
+    const int harmonyNoteIndex = std::max(0, std::min(noteIndex + harmony, 47));
 
-    // Get frequency from scale using the current scale index
+    // Access scale data with cached current scale to avoid external lookups
     extern int scale[7][48];
     extern uint8_t currentScale;
 
-    int scaleNote = scale[currentScale][harmonyNoteIndex];
+    const int scaleNote = scale[currentScale][harmonyNoteIndex];
 
-    // Use mtof() with proper MIDI note calculation
-    // Add 36 to center the scale around middle C, then add octave offset
-    float midiNote = scaleNote + 36 + octaveOffset;
+    // Base MIDI mapping: center around 48 as before (C3-ish) then add octave offset in semitones
+    int midiNote = scaleNote + 48 + static_cast<int>(octaveOffset);
+    // Clamp to table range 0..127
+    midiNote = std::max(0, std::min(midiNote, 127));
 
-    return daisysp::mtof(midiNote);
+    // Fast lookup
+    return frequencyLookupTable[midiNote];
   }
 
   void Voice::processFrequencySlew(uint8_t oscIndex, float targetFreq)
@@ -340,9 +382,8 @@ float Voice::process()
       return;
 
     // Exponential slewing for smooth frequency transitions
-    freqSlew[oscIndex].currentFreq +=
-        (freqSlew[oscIndex].targetFreq - freqSlew[oscIndex].currentFreq) *
-        FREQ_SLEW_RATE;
+    const float delta = freqSlew[oscIndex].targetFreq - freqSlew[oscIndex].currentFreq;
+    freqSlew[oscIndex].currentFreq = std::fmaf(delta, FREQ_SLEW_RATE, freqSlew[oscIndex].currentFreq);
   }
 
   void Voice::setFrequency(float frequency)
@@ -401,8 +442,8 @@ float Voice::process()
       config.oscAmplitudes[1] = .33f;
       config.oscAmplitudes[2] = .33f;
       config.oscDetuning[0] = 0.0f;
-      config.oscDetuning[1] = 0.04;   // Slight detune
-      config.oscDetuning[2] = -0.041f; // Slight detune opposite`
+      config.oscDetuning[1] = 0.047;   // Slight detune
+      config.oscDetuning[2] = -0.044f; // Slight detune opposite`
       config.harmony[0] = 0;          // Root note
       config.harmony[1] = 0;          // Unison (no harmony)
       config.harmony[2] = 0;          // Unison (no harmony)
@@ -430,21 +471,20 @@ float Voice::process()
     VoiceConfig getDigitalVoice()
     {
       VoiceConfig config;
-      config.oscillatorCount = 3;
+      config.oscillatorCount = 1;
       config.oscWaveforms[0] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
-      config.oscWaveforms[1] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
-      config.oscWaveforms[2] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
-      config.oscAmplitudes[0] = 0.4f;
+
+      config.oscAmplitudes[0] = 1.f;
       config.oscAmplitudes[1] = 0.35f;
       config.oscAmplitudes[2] = .36f;
       config.oscPulseWidth[0] = 0.69f;
       config.oscDetuning[0] = 0.0f; // Fixed duplicate assignment
       config.oscDetuning[1] = 0.0f; // Fixed duplicate assignment
       config.oscDetuning[2] = 0.0f;
-      config.harmony[0] = 7;  // Root note
+      config.harmony[0] = 0;  // Root note
       config.harmony[1] = 11; // PERFECT 5TH
-      config.harmony[2] = 14; // Octave
-      config.filterRes = 0.22f;
+      config.harmony[2] = 0; // Octave
+      config.filterRes = 0.42f;
       config.filterDrive = 3.0f;
       config.filterPassbandGain = 0.24f;
       config.highPassFreq = 170.0f;
@@ -456,10 +496,10 @@ float Voice::process()
       config.hasWavefolder = false;
       config.overdriveGain = 0.3f;
       config.overdriveDrive = 0.21f;
-      config.wavefolderGain = 5.0f;
+      config.wavefolderGain = 1.0f;
       config.defaultAttack = 0.015f;
       config.defaultDecay = 0.1f;
-      config.defaultSustain = 0.4f;
+      config.defaultSustain = 0.5f;
       config.defaultRelease = 0.1f;
 
       return config;
@@ -479,11 +519,11 @@ float Voice::process()
       config.harmony[0] = 7; // Root note
       config.harmony[1] = 0; // Unison (bass typically monophonic)
       config.harmony[2] = 0; // Unison
-      config.highPassRes = 0.5f;
-      config.filterRes = 0.2f;
+      config.highPassRes = 0.45f;
+      config.filterRes = 0.33f;
       config.filterDrive = 2.9f;
       config.filterPassbandGain = 0.22f;
-      config.highPassFreq = 65.0f; // Lower for bass
+      config.highPassFreq = 75.0f; // Lower for bass
       config.filterMode = daisysp::LadderFilter::FilterMode::LP24;
       config.hasWavefolder = false;
       config.hasOverdrive = false;
@@ -492,7 +532,7 @@ float Voice::process()
 
       config.defaultAttack = 0.01f;
       config.defaultDecay = 0.3f;
-      config.defaultSustain = 0.6f;
+      config.defaultSustain = 0.5f;
       config.defaultRelease = 0.2f;
 
       return config;
@@ -505,18 +545,18 @@ float Voice::process()
       config.oscWaveforms[0] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
       config.oscWaveforms[1] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
       config.oscWaveforms[2] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
-      config.oscAmplitudes[0] = .39f;
-      config.oscAmplitudes[1] = .3f;
-      config.oscAmplitudes[2] = 0.3f;
+      config.oscAmplitudes[0] = .35f;
+      config.oscAmplitudes[1] = .34f;
+      config.oscAmplitudes[2] = 0.34f;
       config.oscDetuning[0] = 0.0f;
-      config.oscDetuning[1] = 0.36f;
-      config.oscDetuning[2] = -0.34f;
-      config.harmony[0] = 7; // Root note
-      config.harmony[1] = 7; // Unison (lead typically monophonic)
-      config.harmony[2] = 7; // Unison
+      config.oscDetuning[1] = 0.02f;
+      config.oscDetuning[2] = -0.225f;
+      config.harmony[0] = 0; // Root note
+      config.harmony[1] = 0; // Unison (lead typically monophonic)
+      config.harmony[2] = 0; // Unison
 
-      config.filterRes = 0.59f;
-      config.filterDrive = 3.8f;
+      config.filterRes = 0.23f;
+      config.filterDrive = 2.8f;
       config.filterPassbandGain = 0.33f;
       config.highPassFreq = 120.0f;
       config.filterMode = daisysp::LadderFilter::FilterMode::LP24;
@@ -524,11 +564,11 @@ float Voice::process()
       config.hasWavefolder = false;
       config.overdriveGain = 0.2f;
       config.overdriveDrive = 0.25f;
-      config.wavefolderGain = 5.0f;
+      config.wavefolderGain = 1.0f;
 
       config.defaultAttack = 0.02f;
       config.defaultDecay = 0.2f;
-      config.defaultSustain = 0.1f;
+      config.defaultSustain = 0.2f;
       config.defaultRelease = 0.15f;
 
       return config;
@@ -541,19 +581,19 @@ float Voice::process()
       config.oscWaveforms[0] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
       config.oscWaveforms[1] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
       config.oscWaveforms[2] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
-      config.oscAmplitudes[0] = 0.36f;
-      config.oscAmplitudes[1] = 0.36f;
-      config.oscAmplitudes[2] = 0.36f;
+      config.oscAmplitudes[0] = 0.33f;
+      config.oscAmplitudes[1] = 0.32f;
+      config.oscAmplitudes[2] = 0.32f;
       config.harmony[0] = 0; // Root note
       config.harmony[1] = 4; // Perfect Fifth
       config.harmony[2] = 9; // Major Third One octave up
 
       config.filterRes = 0.3f;
-      config.filterDrive = 1.8f;
+      config.filterDrive = 2.8f;
       config.filterPassbandGain = 0.23f;
       config.highPassFreq = 160.0f;
       config.filterMode =
-          daisysp::LadderFilter::FilterMode::LP24; // Band-pass for percussive sound
+          daisysp::LadderFilter::FilterMode::LP12; // Band-pass for percussive sound
 
       config.hasOverdrive = false;
       config.hasWavefolder = false;
@@ -613,27 +653,27 @@ float Voice::process()
       config.useParticleEngine = true;
       config.oscillatorCount = 0; // Ignored when useParticleEngine is true
       // Particle defaults (tweak as desired)
-      config.particleResonance = 0.9f;
-      config.particleDensity   = 0.5f;
+      config.particleResonance = 0.42f;
+      config.particleDensity   = .9f;
       config.particleGain      = 0.8f;
       config.particleSpread    = 2.0f;
       config.particleSync      = false;
 
       // Filtering/envelope for particle timbre
-      config.filterRes = 0.35f;
-      config.filterDrive = 2.0f;
+      config.filterRes = 0.3f;
+      config.filterDrive = 3.0f;
       config.filterPassbandGain = 0.23f;
       config.highPassFreq = 120.0f;
-      config.filterMode = daisysp::LadderFilter::FilterMode::LP24;
+      config.filterMode = daisysp::LadderFilter::FilterMode::BP12;
 
-      config.hasOverdrive = false;
-      config.hasWavefolder = false;
+      config.hasOverdrive = true;
+      config.hasWavefolder = true;
 
       config.defaultAttack = 0.01f;
       config.defaultDecay = 0.18f;
-      config.defaultSustain = 0.4f;
+      config.defaultSustain = 0.f;
       config.defaultRelease = 0.12f;
-      config.outputLevel = 0.7f;
+      config.outputLevel = 1.f;
       return config;
     }
 
