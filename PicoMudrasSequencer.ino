@@ -823,16 +823,7 @@ void loop()
         fill_audio_buffer(buf);
         give_audio_buffer(producer_pool, buf);
     }
-    // Optional runtime toggle via simple Serial commands (non-blocking pattern)
-    if (Serial.available()) {
-        int c = Serial.read();
-        if (c == 'd') { Debug::setEnabled(true); Serial.println("[Debug] Enabled"); }
-        else if (c == 'D') { Debug::setEnabled(false); Serial.println("[Debug] Disabled"); }
-        else if (c == '1') { Debug::setLevel(Debug::Level::Error); Serial.println("[Debug] Level=Error"); }
-        else if (c == '2') { Debug::setLevel(Debug::Level::Warn); Serial.println("[Debug] Level=Warn"); }
-        else if (c == '3') { Debug::setLevel(Debug::Level::Info); Serial.println("[Debug] Level=Info"); }
-        else if (c == '4') { Debug::setLevel(Debug::Level::Verbose); Serial.println("[Debug] Level=Verbose"); }
-    }
+ 
 
 }
 

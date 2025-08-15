@@ -13,6 +13,9 @@
 #include <vector>
 #include <memory>
 
+#include <cstddef>
+#include <cstdint>
+
 /**
  * @brief Configuration structure for a voice
  * Defines the characteristics and behavior of a synthesizer voice
@@ -83,6 +86,13 @@ struct VoiceSlewParams {
  *
  * This class encapsulates all the audio processing components needed for a single voice,
  * making it easy to create multiple independent voices with different characteristics.
+ *
+ * Scale data access and testability:
+ * - Voice no longer reads global scale variables directly. Instead, scale data is injected
+ *   via setter methods (see setScaleTable and setCurrentScalePointer).
+ * - This reduces global-state coupling and makes the class easier to unit test: tests can
+ *   provide a mock scale table and a fixed/current scale index without relying on externs.
+ * - If no scale data is injected, Voice falls back to chromatic mapping for note calculation.
  */
 class Voice {
 public:
@@ -148,6 +158,25 @@ public:
      * @param seq Raw pointer to sequencer object
      */
     void setSequencer(Sequencer* seq);
+
+    /**
+     * @brief Inject scale data (48-step per-scale tables) to remove global dependencies
+     * @param table Pointer to a 2D array of shape [scaleCount][48]
+     * @param scaleCount Number of scales available in the table
+     *
+     * The Voice will use this table to map scale step indices (0..47) to semitone offsets.
+     * Pass nullptr to disable and fall back to chromatic mapping.
+     */
+    void setScaleTable(const int (*table)[48], size_t scaleCount);
+
+    /**
+     * @brief Inject a pointer to the current scale index used with the injected table
+     * @param currentScalePtr Pointer to an externally managed current-scale index
+     *
+     * The pointed value is read at note-calculation time. If nullptr (or out of bounds),
+     * Voice falls back to chromatic mapping.
+     */
+    void setCurrentScalePointer(const uint8_t* currentScalePtr);
 
     /**
      * @brief Get pointer to the voice's sequencer
@@ -234,6 +263,12 @@ private:
     // Covers all possible MIDI notes (0-127) to avoid mtof() calculations
     static float frequencyLookupTable[128];
     static bool lookupTableInitialized;
+
+    // Injected scale data (optional). When null, Voice uses chromatic mapping.
+    // scaleTable is a pointer to an array of 48-step scales; scaleTableCount is number of scales.
+    const int (*scaleTable)[48] = nullptr;
+    size_t scaleTableCount = 0;
+    const uint8_t* currentScalePtr = nullptr; // Pointer to externally managed current-scale index
 
     // Audio processing components
     std::vector<daisysp::Oscillator> oscillators;

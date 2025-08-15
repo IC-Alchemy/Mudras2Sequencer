@@ -1,6 +1,5 @@
 #include "Voice.h"
 #include "../dsp/dsp.h"
-#include "../scales/scales.h"
 #include "Arduino.h"
 #include <algorithm>
 #include <cmath>
@@ -119,6 +118,7 @@ void Voice::init(float sr)
 
   if (config.hasWavefolder)
   {
+
     wavefolder.Init();
     wavefolder.SetGain(config.wavefolderGain);
     wavefolder.SetOffset(config.wavefolderOffset);
@@ -133,7 +133,6 @@ void Voice::setConfig(const VoiceConfig &cfg)
   if (oscillators.size() != config.oscillatorCount)
   {
     oscillators.resize(config.oscillatorCount);
-
     // Initialize new oscillators
     for (size_t i = 0; i < oscillators.size(); i++)
     {
@@ -143,6 +142,18 @@ void Voice::setConfig(const VoiceConfig &cfg)
 
   // Update all components with new configuration
   init(sampleRate);
+}
+
+// Injected scale-data setters (defined out-of-line)
+void Voice::setScaleTable(const int (*table)[48], size_t scaleCount)
+{
+  scaleTable = table;
+  scaleTableCount = scaleCount;
+}
+
+void Voice::setCurrentScalePointer(const uint8_t* ptr)
+{
+  currentScalePtr = ptr;
 }
 
 float Voice::process()
@@ -161,8 +172,8 @@ float Voice::process()
   }
 
   // Process envelope
- // float envelopeValue = config.hasEnvelope ? envelope.Process(gate) : 1.0f;
-  float envelopeValue =  envelope.Process(gate);
+ float envelopeValue = config.hasEnvelope ? envelope.Process(gate) : 1.0f;
+  //float envelopeValue =  envelope.Process(gate);
 
   // Update filter frequency with envelope modulation
   filter.SetFreq(100.f + (filterFrequency * envelopeValue) +
@@ -183,9 +194,8 @@ float Voice::process()
 
   if (config.useParticleEngine)
   {
-    config.particleDensity=state.velocity*envelopeValue;
-
-    // Particle synthesis path
+  float dynamicDensity = config.particleDensity * state.velocity * envelopeValue;
+particle_.SetDensity(dynamicDensity);
     mixedOscillators = particle_.Process();
 
   }
@@ -361,14 +371,19 @@ float Voice::process()
     // Apply harmony interval, ensuring we stay within scale bounds
     const int harmonyNoteIndex = std::max(0, std::min(noteIndex + harmony, 47));
 
-    // Access scale data with cached current scale to avoid external lookups
-    extern int scale[7][48];
-    extern uint8_t currentScale;
-
-    const int scaleNote = scale[currentScale][harmonyNoteIndex];
+    // Resolve scale step to semitone offset using injected scale table if available
+    int scaleSemitone = harmonyNoteIndex; // chromatic fallback: 0..47 maps to 0..47
+    if (scaleTable && scaleTableCount > 0 && currentScalePtr)
+    {
+      const uint8_t idx = *currentScalePtr;
+      if (idx < scaleTableCount)
+      {
+        scaleSemitone = scaleTable[idx][harmonyNoteIndex];
+      }
+    }
 
     // Base MIDI mapping: center around 48 as before (C3-ish) then add octave offset in semitones
-    int midiNote = scaleNote + 48 + static_cast<int>(octaveOffset);
+    int midiNote = scaleSemitone + 48 + static_cast<int>(octaveOffset);
     // Clamp to table range 0..127
     midiNote = std::max(0, std::min(midiNote, 127));
 
