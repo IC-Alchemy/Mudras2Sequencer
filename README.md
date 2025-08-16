@@ -3,7 +3,10 @@ Fully featured sequencer project for the Raspberry Pi Pico2 microcontroller.
 Currently under active development but audio output works and midi output.
 
 ### Goal:  
-    Make a step sequencer that is FUN, easy to learn while rewarding practice, and creates music that feels good.
+Make a step sequencer that:
+feels like performing live instead of turning knobs, 
+simple to understand yet difficult to naster
+sounds GOOD, and feels GOOD
 
 Mudras is a eurorack module I made that uses a LIDAR sensor to measure the distance from the module as an input for a CV sequencer.
 This project expands on that concept by using the same LIDAR technology to sequence multiple parameters on 4 seperate synth voices.
