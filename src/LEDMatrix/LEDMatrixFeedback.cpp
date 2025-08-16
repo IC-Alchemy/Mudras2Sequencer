@@ -392,7 +392,7 @@ static void renderVoicePair(
         
         // Fixed LED index calculation for bottom row 
         // For 8x8 matrix: bottom half starts at row 4 (y=4), which is index 32
-        int bottomRowIndex = baseOffset + 32 + step; // 32 = 4 rows * 8 LEDs per row
+        int bottomRowIndex = baseOffset + 24 + step; // 32 = 4 rows * 8 LEDs per row
         nblend(smoothedTargetColors[bottomRowIndex], colorB, TARGET_SMOOTHING_BLEND_AMOUNT);
         nblend(ledMatrix.getLeds()[bottomRowIndex], smoothedTargetColors[bottomRowIndex], 166);
     }
@@ -419,7 +419,7 @@ void updateGateLEDs(
             nblend(ledMatrix.getLeds()[step], smoothedTargetColors[step], 222);
 
             // Voice 2 bottom half - fixed offset calculation
-            int ledIndex = 32 + step; // Bottom half of 8x8 matrix
+            int ledIndex = 24 + step; // Bottom half of 8x8 matrix
             nblend(smoothedTargetColors[ledIndex], currentTarget, TARGET_SMOOTHING_BLEND_AMOUNT);
             nblend(ledMatrix.getLeds()[ledIndex], smoothedTargetColors[ledIndex], 222);
         }
@@ -462,7 +462,7 @@ void updateGateLEDs(
                 targetColor2 += activeThemeColors->playheadAccent;
             }
 
-            int ledIndex = 32 + step; // Fixed offset for bottom half
+            int ledIndex = 24 + step; // Fixed offset for bottom half
             nblend(smoothedTargetColors[ledIndex], targetColor2, TARGET_SMOOTHING_BLEND_AMOUNT);
             nblend(ledMatrix.getLeds()[ledIndex], smoothedTargetColors[ledIndex], 166);
         }
@@ -548,7 +548,7 @@ void updateStepLEDs(
         bool isSecondInPair = (uiState.selectedVoiceIndex % 2) == 1;
         for (int step = 0; step < 16; ++step) {
             int topIndex = step;
-            int bottomIndex = 32 + step; // Fixed offset for 8x8 matrix
+            int bottomIndex = 24 + step; // Fixed offset for 8x8 matrix
             if (!isSecondInPair) {
                 // Selected voice is top row; dim bottom
                 nblend(smoothedTargetColors[bottomIndex], CRGB::Black, TARGET_SMOOTHING_BLEND_AMOUNT);
@@ -574,7 +574,7 @@ void updateStepLEDs(
             } else {
                 targetColor = CRGB::Black;
             }
-            int ledIndex = (isSecondInPair ? 32 : 0) + step; // Fixed offset
+            int ledIndex = (isSecondInPair ? 24 : 0) + step; // Fixed offset
             nblend(smoothedTargetColors[ledIndex], targetColor, TARGET_SMOOTHING_BLEND_AMOUNT);
             nblend(ledMatrix.getLeds()[ledIndex], smoothedTargetColors[ledIndex], isSecondInPair ? 122 : 64);
         }
@@ -593,14 +593,14 @@ void updateStepLEDs(
                                    ? getParameterColor(activeParamIdForLength, 180)
                                    : (isSecondInPair ? activeThemeColors->editModeDimBlueV2
                                                      : activeThemeColors->editModeDimBlueV1);
-            int ledIndex = (isSecondInPair ? 32 : 0) + step; // Fixed offset
+            int ledIndex = (isSecondInPair ? 24 : 0) + step; // Fixed offset
             nblend(smoothedTargetColors[ledIndex], targetColor, TARGET_SMOOTHING_BLEND_AMOUNT);
             nblend(ledMatrix.getLeds()[ledIndex], smoothedTargetColors[ledIndex], isSecondInPair ? 200 : 60);
         }
 
         // Dim the other row's within-length area
         for (int step = 0; step < currentLength; ++step) {
-            int otherIndex = (isSecondInPair ? 0 : 32) + step; // Fixed offset
+            int otherIndex = (isSecondInPair ? 0 : 24) + step; // Fixed offset
             nblend(smoothedTargetColors[otherIndex], CRGB::Black, TARGET_SMOOTHING_BLEND_AMOUNT);
             nblend(ledMatrix.getLeds()[otherIndex], smoothedTargetColors[otherIndex], 150);
         }
@@ -632,16 +632,10 @@ void updateStepLEDs(
             addPolyrhythmicOverlay(ledMatrix, seq4, true, 32);
         }
 
-        // Corner indicator for page: top-left = page1 (1/2), top-right = page2 (3/4)
-        if (showFirstPair) {
-            ledMatrix.setLED(0, 0, CRGB(0, 15, 0)); // small green dot
-        } else {
-            ledMatrix.setLED(LEDMatrix::WIDTH - 1, 0, CRGB(0, 15, 15)); // cyan dot
-        }
-
+  
         // Highlight selected step if editing
         if (uiState.selectedStepForEdit >= 0 && uiState.selectedStepForEdit < 16) {
-            int ledIndex = uiState.selectedVoiceIndex % 2 == 1 ? (32 + uiState.selectedStepForEdit) : uiState.selectedStepForEdit; // Fixed offset
+            int ledIndex = uiState.selectedVoiceIndex % 2 == 1 ? (24 + uiState.selectedStepForEdit) : uiState.selectedStepForEdit; // Fixed offset
 
             static bool blinkState = false;
             static uint32_t lastBlinkTime = 0;

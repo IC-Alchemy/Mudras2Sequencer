@@ -6,6 +6,8 @@
 #include "../voice/Voice.h"
 #include "../voice/VoiceManager.h"
 #include "ButtonManager.h"
+#include "ButtonHandlers.h"
+#include "UIConstants.h"
 #include <uClock.h>
 
 static_assert(UIState::NUM_RANDOMIZE >= 4, "UI expects 4 randomize buttons; update UIState::NUM_RANDOMIZE or adjust handlers.");
@@ -43,8 +45,6 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
 
 static void autoSelectAS5600Parameter(ParamId paramId, UIState &uiState);
 static void handleAS5600ParameterControl(UIState &uiState);
-static void handleControlButtonEvent(uint8_t buttonIndex, UIState &uiState,
-                                     Sequencer &seq1, Sequencer &seq2);
 
 void initUIEventHandler(UIState &uiState) {
   initButtonManager(uiState);
@@ -151,105 +151,45 @@ if (evt.buttonIndex == BUTTON_SLIDE_MODE) {
     return;
 
   // Handle Randomize 1 button: short press randomizes, long press resets
-  // immediately
   if (evt.buttonIndex == BUTTON_RANDOMIZE_SEQ1) {
     const int idx = 0;
     if (evt.type == MATRIX_BUTTON_PRESSED) {
-      // Record press start time
-      uiState.randomizePressTime[idx] = millis();
-      uiState.randomizeWasPressed[idx] = true;
+      beginRandomizePress(idx, uiState);
     } else if (evt.type == MATRIX_BUTTON_RELEASED) {
-      // Calculate press duration
-      unsigned long heldTime = millis() - uiState.randomizePressTime[idx];
-      if (!isLongPress(heldTime)) {
-        // Short press: randomize parameters
-        seq1.randomizeParameters();
-        Serial.println("Seq 1 randomized by short press");
-      }
-      // Reset button state flags
-      uiState.randomizeWasPressed[idx] = false;
-      uiState.randomizeResetTriggered[idx] = false;
-      // Common UI updates
-      uiState.selectedStepForEdit = -1;
-      uiState.flash31Until = millis() + CONTROL_LED_FLASH_DURATION_MS;
+      handleRandomizeButton(idx, uiState);
     }
     return; // Exit after handling
   }
 
   // Handle Randomize 2 button: short press randomizes, long press resets
-  // immediately
   if (evt.buttonIndex == BUTTON_RANDOMIZE_SEQ2) {
     const int idx = 1;
     if (evt.type == MATRIX_BUTTON_PRESSED) {
-      // Record press start time
-      uiState.randomizePressTime[idx] = millis();
-      uiState.randomizeWasPressed[idx] = true;
+      beginRandomizePress(idx, uiState);
     } else if (evt.type == MATRIX_BUTTON_RELEASED) {
-      // Calculate press duration
-      unsigned long heldTime = millis() - uiState.randomizePressTime[idx];
-      if (!isLongPress(heldTime)) {
-        // Short press: randomize parameters
-        seq2.randomizeParameters();
-        Serial.println("Seq 2 randomized by short press");
-      }
-      // Reset button state flags
-      uiState.randomizeWasPressed[idx] = false;
-      uiState.randomizeResetTriggered[idx] = false;
-      // Common UI updates
-      uiState.selectedStepForEdit = -1;
-      uiState.flash31Until = millis() + CONTROL_LED_FLASH_DURATION_MS;
+      handleRandomizeButton(idx, uiState);
     }
     return; // Exit after handling
   }
  
   // Handle Randomize 3 button: short press randomizes, long press resets
-  // immediately
   if (evt.buttonIndex == BUTTON_RANDOMIZE_SEQ3) {
     const int idx = 2;
     if (evt.type == MATRIX_BUTTON_PRESSED) {
-      // Record press start time
-      uiState.randomizePressTime[idx] = millis();
-      uiState.randomizeWasPressed[idx] = true;
+      beginRandomizePress(idx, uiState);
     } else if (evt.type == MATRIX_BUTTON_RELEASED) {
-      // Calculate press duration
-      unsigned long heldTime = millis() - uiState.randomizePressTime[idx];
-      if (!isLongPress(heldTime)) {
-        // Short press: randomize parameters
-        seq3.randomizeParameters();
-        Serial.println("Seq 3 randomized by short press");
-      }
-      // Reset button state flags
-      uiState.randomizeWasPressed[idx] = false;
-      uiState.randomizeResetTriggered[idx] = false;
-      // Common UI updates
-      uiState.selectedStepForEdit = -1;
-      uiState.flash31Until = millis() + CONTROL_LED_FLASH_DURATION_MS;
+      handleRandomizeButton(idx, uiState);
     }
     return; // Exit after handling
   }
  
   // Handle Randomize 4 button: short press randomizes, long press resets
-  // immediately
   if (evt.buttonIndex == BUTTON_RANDOMIZE_SEQ4) {
     const int idx = 3;
     if (evt.type == MATRIX_BUTTON_PRESSED) {
-      // Record press start time
-      uiState.randomizePressTime[idx] = millis();
-      uiState.randomizeWasPressed[idx] = true;
+      beginRandomizePress(idx, uiState);
     } else if (evt.type == MATRIX_BUTTON_RELEASED) {
-      // Calculate press duration
-      unsigned long heldTime = millis() - uiState.randomizePressTime[idx];
-      if (!isLongPress(heldTime)) {
-        // Short press: randomize parameters
-        seq4.randomizeParameters();
-        Serial.println("Seq 4 randomized by short press");
-      }
-      // Reset button state flags
-      uiState.randomizeWasPressed[idx] = false;
-      uiState.randomizeResetTriggered[idx] = false;
-      // Common UI updates
-      uiState.selectedStepForEdit = -1;
-      uiState.flash31Until = millis() + CONTROL_LED_FLASH_DURATION_MS;
+      handleRandomizeButton(idx, uiState);
     }
     return; // Exit after handling
   }
@@ -273,7 +213,7 @@ if (evt.buttonIndex == BUTTON_SLIDE_MODE) {
         Serial.println("Entered settings mode");
       } else if (!isLongPress(pressDuration)) {
         // Short press: normal play/stop functionality
-        handleControlButtonEvent(evt.buttonIndex, uiState, seq1, seq2);
+        handleControlButton(evt.buttonIndex, uiState);
       }
     }
     return;
@@ -281,7 +221,7 @@ if (evt.buttonIndex == BUTTON_SLIDE_MODE) {
 
   // Handle other control buttons (only on press)
   if (evt.type == MATRIX_BUTTON_PRESSED) {
-    handleControlButtonEvent(evt.buttonIndex, uiState, seq1, seq2);
+    handleControlButton(evt.buttonIndex, uiState);
   }
 }
 
@@ -550,81 +490,7 @@ static bool handleStepButtonEvent(const MatrixButtonEvent &evt,
   return true;
 }
 
-static void handleControlButtonEvent(uint8_t buttonIndex, UIState &uiState,
-                                     Sequencer &seq1, Sequencer &seq2) {
-  switch (buttonIndex) {
-  case BUTTON_SLIDE_MODE:
-    uiState.slideMode = !uiState.slideMode;
-    uiState.selectedStepForEdit = -1;
-    uiState.currentEditParameter =
-        ParamId::Count; // Clear edit parameter when exiting edit mode
-    Serial.print("Slide mode ");
-    Serial.println(uiState.slideMode ? "ON" : "OFF");
-    break;
-  case BUTTON_AS5600_CONTROL:
-    handleAS5600ParameterControl(uiState);
-    break;
-  case BUTTON_PLAY_STOP:
-    if (isClockRunning) {
-      onClockStop();
-      //  Settings mode should turn on here
-      uiState.settingsMode = true;
-    } else {
-      onClockStart();
-      //  Settings mode should turn off here
-      if (uiState.settingsMode) {
-        uiState.settingsMode = false;
-        uiState.inPresetSelection = false;
-        Serial.println("Exited settings mode");
-      }
-      uiState.flash25Until = millis() + CONTROL_LED_FLASH_DURATION_MS;
-    }
-    break;
-  case BUTTON_CHANGE_SCALE:
-    currentScale = (currentScale + 1) % 7;
-    Serial.print("Scale changed to: ");
-    Serial.print(currentScale);
-    Serial.print(" (");
-    Serial.print(scaleNames[currentScale]);
-    Serial.println(")");
-    break;
-  case BUTTON_CHANGE_THEME:
-    uiState.currentThemeIndex =
-        (uiState.currentThemeIndex + 1) % static_cast<int>(LEDTheme::COUNT);
-    setLEDTheme(static_cast<LEDTheme>(uiState.currentThemeIndex));
-    break;
-  case BUTTON_CHANGE_SWING_PATTERN:
-    uiState.currentShufflePatternIndex =
-        (uiState.currentShufflePatternIndex + 1) % NUM_SHUFFLE_TEMPLATES;
-    {
-      const ShuffleTemplate &currentTemplate =
-          shuffleTemplates[uiState.currentShufflePatternIndex];
-
-      // Apply shuffle template to uClock
-      uClock.setShuffleTemplate(const_cast<int8_t *>(currentTemplate.ticks),
-                                SHUFFLE_TEMPLATE_SIZE);
-      uClock.setShuffle(uiState.currentShufflePatternIndex >
-                        0); // Enable shuffle if not "No Shuffle"
-
-      Serial.print("Shuffle pattern changed to index ");
-      Serial.print(uiState.currentShufflePatternIndex);
-      Serial.print(": ");
-      Serial.println(currentTemplate.name);
-    }
-    break;
-
-  case BUTTON_TOGGLE_DELAY:
-    uiState.delayOn = !uiState.delayOn;
-    uiState.flash23Until = millis() + CONTROL_LED_FLASH_DURATION_MS;
-    if (uiState.delayOn) {
-      uiState.currentAS5600Parameter = AS5600ParameterMode::DelayTime;
-    //  Serial.println("Delay ON - AS5600 set to Delay Time");
-    } else {
-    //  Serial.println("Delay OFF");
-    }
-    break;
-  }
-}
+// Obsolete static handleControlButtonEvent removed; logic is centralized in handleControlButton (ButtonHandlers.cpp)
 
 static void autoSelectAS5600Parameter(ParamId paramId, UIState &uiState) {
   AS5600ParameterMode newAS5600Param;

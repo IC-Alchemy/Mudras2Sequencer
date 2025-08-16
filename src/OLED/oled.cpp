@@ -5,6 +5,8 @@
 #include "../sequencer/ShuffleTemplates.h"
 #include "../scales/scales.h"
 #include "../ui/ButtonManager.h"
+#include <cstring>  // For strcmp, strlen
+#include <Arduino.h>
 
 // Constructor implementation
 OLEDDisplay::OLEDDisplay() : display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET), initialized(false) {
@@ -24,7 +26,8 @@ bool OLEDDisplay::begin() {
     display.setTextSize(1);
     display.setTextColor(SH110X_WHITE);
     display.setCursor(0, 0);
-    display.println("You did it, Here we go");    delay(500);
+    // More exciting intro
+    runStartupAnimation();
 
     Serial.println("OLED display initialized successfully");
     return true;
@@ -52,10 +55,11 @@ void OLEDDisplay::displayVoiceParameterToggles(const UIState& uiState, VoiceMana
     // Draw border for professional look
     display.drawRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, SH110X_WHITE);
 
-    // Compact header with current voice indicator
+    // Header with current voice indicator
     display.setCursor(2, 2);
-    display.print("VOICE PARAMS - EDITING V");
+    display.print("VOICE ");
     display.print(uiState.selectedVoiceIndex + 1);
+    display.print(" PARAMETERS");
 
     // Draw separator line
     display.drawFastHLine(2, 10, SCREEN_WIDTH - 4, SH110X_WHITE);
@@ -63,81 +67,74 @@ void OLEDDisplay::displayVoiceParameterToggles(const UIState& uiState, VoiceMana
     // Get external voice IDs
     extern uint8_t leadVoiceId;
     extern uint8_t bassVoiceId;
-
     extern uint8_t voice3Id;
     extern uint8_t voice4Id;
 
-    // Compact parameter display for 2 voices
-    const char* paramNames[] = {"E", "O", "W", "F", "R", "D"}; // Single letters
+    // Get the current voice ID based on selected index
+    uint8_t voiceIds[] = {leadVoiceId, bassVoiceId, voice3Id, voice4Id};
+    uint8_t currentVoiceId = voiceIds[uiState.selectedVoiceIndex];
+    VoiceConfig* config = voiceManager->getVoiceConfig(currentVoiceId);
+    
+    if (!config) {
+        display.setCursor(2, 25);
+        display.print("Voice config error");
+        display.display();
+        return;
+    }
+
+    // Parameter names and button mappings
+    const char* paramNames[] = {"Envelope", "Overdrive", "Wavefolder", "Filter Mode", "Filter Res", "Dalek"};
     const int paramButtons[] = {9, 10, 11, 12, 13, 14};
     const int numParams = 6;
 
-    // Voice IDs to display
-    uint8_t voiceIds[] = {leadVoiceId, bassVoiceId, voice3Id, voice4Id};
-    const char* voiceLabels[] = {"V1", "V2", "V3", "V4"};
+    // Display parameters in a clear vertical layout
+    int yStart = 18;
+    for (int i = 0; i < numParams; i++) {
+        int yPos = yStart + (i * 10);
+        
+        // Parameter name
+        display.setCursor(4, yPos);
+        display.print(paramNames[i]);
+        display.print(":");
 
-    // Show parameters for all voices in compact grid (2 rows x 2 columns)
-    for (int voiceIndex = 0; voiceIndex < 4; voiceIndex++) {
-        uint8_t voiceId = voiceIds[voiceIndex];
-        VoiceConfig* config = voiceManager->getVoiceConfig(voiceId);
-        if (!config) continue;
-
-        // Layout: two rows (y=13, y=31) and two columns (x offsets)
-        int row = voiceIndex / 2;  // 0 or 1
-        int col = voiceIndex % 2;  // 0 or 1
-        int yStart = 13 + (row * 18);
-        int xStart = (col == 0) ? 2 : 66; // split screen
-
-        // Voice header with selection indicator
-        display.setCursor(xStart, yStart);
-        bool isCurrentVoice = (voiceIndex == uiState.selectedVoiceIndex);
-
-        if (isCurrentVoice) {
-            display.print("*");  // Indicate currently selected voice being edited
-        } else {
-            display.print(" ");
-        }
-        display.print(voiceLabels[voiceIndex]);
-
-        // Parameter states in compact format
-        for (int i = 0; i < numParams; i++) {
-            int xPos = xStart + 10 + (i * 10); // denser per-voice grid
-            display.setCursor(xPos, yStart);
-
-            // Get parameter state
-            bool paramState = false;
-            switch (paramButtons[i]) {
-                case 9: paramState = config->hasEnvelope; break;
-                case 10: paramState = config->hasOverdrive; break;
-                case 11: paramState = config->hasWavefolder; break;
-                case 12:
-                    // Show filter mode as number (0-4)
-                    display.print(static_cast<int>(config->filterMode));
-                    continue;
-                case 13:
-                    // Show resonance as 2-digit percentage
-                    display.print((int)(config->filterRes * 100));
-                    continue;
-                case 14: paramState = config->hasDalek; break;
-            }
-
-            // Display compact ON/OFF state
-            if (paramButtons[i] != 12 && paramButtons[i] != 13) {
-                display.print(paramState ? "1" : "0");
-            }
+        // Parameter value/state
+        display.setCursor(70, yPos);
+        switch (paramButtons[i]) {
+            case 9: // Envelope
+                display.print(config->hasEnvelope ? "ON" : "OFF");
+                break;
+            case 10: // Overdrive
+                display.print(config->hasOverdrive ? "ON" : "OFF");
+                break;
+            case 11: // Wavefolder
+                display.print(config->hasWavefolder ? "ON" : "OFF");
+                break;
+            case 12: // Filter Mode
+                {
+                    const char* filterNames[] = {"LP12", "LP24", "LP36", "BP12", "BP24"};
+                    int mode = static_cast<int>(config->filterMode);
+                    if (mode >= 0 && mode < 5) {
+                        display.print(filterNames[mode]);
+                    } else {
+                        display.print("UNK");
+                    }
+                }
+                break;
+            case 13: // Filter Resonance
+                display.print((int)(config->filterRes * 100));
+                display.print("%");
+                break;
+            case 14: // Dalek
+                display.print(config->hasDalek ? "ON" : "OFF");
+                break;
         }
 
-        // Parameter labels on second line (single letters)
-        for (int i = 0; i < numParams; i++) {
-            int xPos = xStart + 10 + (i * 10);
-            display.setCursor(xPos, yStart + 8);
-            display.print(paramNames[i]);
-        }
+        // Button number indicator
+        display.setCursor(110, yPos);
+        display.print("[");
+        display.print(paramButtons[i]);
+        display.print("]");
     }
-
-    // Compact instructions at bottom
-    display.setCursor(2, 56);
-    display.print("9-14:TOG *=EDITING 8:BACK");
 
     display.display();
 }
@@ -158,7 +155,8 @@ void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Se
     display.setTextColor(SH110X_WHITE);
 
     // Draw a border for a more professional look
-    display.drawRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, SH110X_WHITE);
+    // display.drawRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, SH110X_WHITE);
+    drawAnimatedBorder();
 
     // Priority-based display logic to prevent menu conflicts
 
@@ -232,7 +230,7 @@ void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Se
             display.setCursor(5, 20);
             display.setTextSize(2);
             display.print("Step ");
-            display.print(uiState.selectedStepForEdit + 1);
+              display.print(uiState.selectedStepForEdit + 1);
 
             display.setCursor(5, 40);
             display.setTextSize(1);
@@ -242,22 +240,23 @@ void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Se
         }
     } else {
         // Default screen: Show current scale and shuffle pattern with enhanced formatting
+
+        // Default Screen
         display.setTextSize(1);
 
         // Header with title
-        display.setCursor(25, 5);
+        display.setCursor(5, 5);
         display.setTextSize(1);
-        display.print("Mudras Sequencer");
 
         // Horizontal line under header
-        display.drawFastHLine(5, 14, SCREEN_WIDTH - 10, SH110X_WHITE);
+        //display.drawFastHLine(5, 14, SCREEN_WIDTH - 10, SH110X_WHITE);
 
         // Scale section
 
-        display.setCursor(5, 20);
-        display.print("Scale:");
+        //di//splay.setCursor(5, 20);
+        //display.print("Scale:");
 
-        display.setCursor(55, 20);
+        display.setCursor(5, 5);
         display.setTextSize(1);
         display.print(scaleNames[currentScale]);
 
@@ -266,21 +265,30 @@ void OLEDDisplay::update(const UIState& uiState, const Sequencer& seq1, const Se
 
         // Shuffle section
 
-        display.setCursor(5, 36);
-        display.print("Shuffle:");
+        display.setCursor(5, 20);
+        //display.print("Shuffle:");
 
-        display.setCursor(65, 36);
+        //display.setCursor(65, 36);
         display.print(getShuffleTemplateName(uiState.currentShufflePatternIndex));
 
         // Bottom status line
      //   display.drawFastHLine(5, 48, SCREEN_WIDTH - 10, SH110X_WHITE);
-        display.setCursor(5, 52);
-        display.setTextSize(1);
+        display.setCursor(5, 35);
+      //  display.setTextSize(1);
+        display.setTextSize(2);
         display.print("Voice: ");
+        display.setTextSize(3);
+
         display.print(uiState.selectedVoiceIndex + 1);
 
+        // Beat-synced step indicators at the bottom
+        const Sequencer& currentSeqDefault = (uiState.selectedVoiceIndex == 0) ? seq1 :
+                                             (uiState.selectedVoiceIndex == 1) ? seq2 :
+                                             (uiState.selectedVoiceIndex == 2) ? seq3 : seq4;
+        drawStepIndicators(currentSeqDefault, 54);
+
         // Current step indicator
-        display.setCursor(70, 52);
+        //display.setCursor(70, 52);
     }
 
     display.display();
@@ -411,6 +419,11 @@ void OLEDDisplay::displaySettingsMenu(const UIState& uiState) {
         display.setCursor(centerX, 20);
         display.print(currentPresetName);
 
+        // Subtle underline animation
+        uint8_t phase = (millis() / 120) % (SCREEN_WIDTH - 10);
+        display.drawFastHLine(5, 38, SCREEN_WIDTH - 10, SH110X_WHITE);
+        display.drawFastHLine(5, 39, phase, SH110X_WHITE);
+
         // Navigation indicators
         display.setTextSize(1);
 
@@ -436,15 +449,12 @@ void OLEDDisplay::displaySettingsMenu(const UIState& uiState) {
         display.print("/");
         display.print(VoicePresets::getPresetCount());
 
-        // Instructions
-        display.setCursor(SCREEN_WIDTH - 84, 56); // Right-aligned
-        display.print("BTN1-6:SEL BTN8:OK");
 
     } else {
         // Enhanced main settings menu
         display.setCursor(5, 5);
         display.setTextSize(1);
-        display.print("SETTINGS MENU");
+        display.print("Sound Buffet");
 
         // Draw separator line
         display.drawFastHLine(5, 14, SCREEN_WIDTH - 10, SH110X_WHITE);
@@ -453,34 +463,23 @@ void OLEDDisplay::displaySettingsMenu(const UIState& uiState) {
         for (int i = 0; i < 4; i++) {
             int yPos = 20 + (i * 10);
 
-            // Selection indicator
-            if (uiState.settingsMenuIndex == i) {
-                // Draw selection box
-                display.drawRect(2, yPos - 2, SCREEN_WIDTH - 4, 9, SH110X_WHITE);
-                display.setCursor(5, yPos);
-                display.print("> ");
+            // Animated bullet
+            uint8_t blink = ((millis() / 250) + i) % 2;
+            if (blink) {
+                display.fillCircle(4, yPos + 2, 2, SH110X_WHITE);
             } else {
-                display.setCursor(5, yPos);
-                display.print("  ");
+                display.drawCircle(4, yPos + 2, 2, SH110X_WHITE);
             }
 
-            // Voice label
-            display.print("VOICE ");
-            display.print(i + 1);
-
             // Current preset name
-            display.setCursor(58, yPos);
+            display.setCursor(12, yPos);
             const char* presetName = (i == 0) ? VoicePresets::getPresetName(uiState.voice1PresetIndex) :
                                      (i == 1) ? VoicePresets::getPresetName(uiState.voice2PresetIndex) :
                                      (i == 2) ? VoicePresets::getPresetName(uiState.voice3PresetIndex) :
                                                 VoicePresets::getPresetName(uiState.voice4PresetIndex);
-            display.print("Preset: ");
             display.print(presetName);
         }
 
-        // Instructions at bottom
-        display.setCursor(5, 56);
-        display.print("B 1-2:SEL  B 8:EDIT  B 9-24:PARAMS");
     }
 }
 
@@ -735,4 +734,97 @@ void OLEDDisplay::onVoiceSwitched(uint8_t newVoiceId) {
     // This method provides the minimal interface compliance
     // The extended version with UIState and VoiceManager parameters
     // should be used for full functionality
+}
+
+// --- Visual Enhancement Helpers ---
+void OLEDDisplay::drawAnimatedBorder() {
+    // Simple corner pulse animation
+    const unsigned long now = millis();
+    if (now - lastAnimFrameMs > 80) {
+        lastAnimFrameMs = now;
+        borderAnimPhase = (borderAnimPhase + 1) % 8;
+    }
+
+    // Base border
+    display.drawRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, SH110X_WHITE);
+
+    // Pulsing corner pixels
+    uint8_t p = borderAnimPhase;
+    // Top-left
+    if (p == 0 || p == 4) display.fillRect(0, 0, 3, 1, SH110X_WHITE);
+    if (p == 1 || p == 5) display.fillRect(0, 0, 1, 3, SH110X_WHITE);
+    // Top-right
+    if (p == 2 || p == 6) display.fillRect(SCREEN_WIDTH - 3, 0, 3, 1, SH110X_WHITE);
+    if (p == 3 || p == 7) display.fillRect(SCREEN_WIDTH - 1, 0, 1, 3, SH110X_WHITE);
+    // Bottom-left
+    if (p == 6 || p == 2) display.fillRect(0, SCREEN_HEIGHT - 1, 3, 1, SH110X_WHITE);
+    if (p == 7 || p == 3) display.fillRect(0, SCREEN_HEIGHT - 3, 1, 3, SH110X_WHITE);
+    // Bottom-right
+    if (p == 4 || p == 0) display.fillRect(SCREEN_WIDTH - 3, SCREEN_HEIGHT - 1, 3, 1, SH110X_WHITE);
+    if (p == 5 || p == 1) display.fillRect(SCREEN_WIDTH - 1, SCREEN_HEIGHT - 3, 1, 3, SH110X_WHITE);
+}
+
+void OLEDDisplay::drawStepIndicators(const Sequencer& seq, int y) {
+    // Draw mini step bars across the bottom, highlighting current step and gate on/off
+    uint8_t stepCount = seq.getParameterStepCount(ParamId::Gate);
+    if (stepCount == 0) stepCount = 16;
+
+    const uint8_t cur = seq.getCurrentStep();
+    const int left = 4;
+    const int right = SCREEN_WIDTH - 4;
+    const int width = right - left;
+
+    for (uint8_t i = 0; i < stepCount && i < 32; ++i) {
+        int x = left + (i * width) / stepCount;
+        int nextX = left + ((i + 1) * width) / stepCount;
+        int w = max(2, nextX - x - 1);
+
+        float gate = seq.getStepParameterValue(ParamId::Gate, i);
+        bool on = gate > 0.5f;
+        bool isCur = (i == cur);
+        int h = isCur ? 6 : (on ? 4 : 3); // Make gate-off bars a touch taller
+
+        int yTop = y - h;
+        if (on) {
+            display.fillRect(x, yTop, w, h, SH110X_WHITE);
+        } else {
+            display.drawRect(x, yTop, w, h, SH110X_WHITE);
+        }
+    }
+}
+
+void OLEDDisplay::runStartupAnimation() {
+    // Simple wipe + title bounce
+    display.clearDisplay();
+
+    // Wipe
+    for (int w = 0; w <= SCREEN_WIDTH; w += 8) {
+        display.fillRect(0, 0, w, SCREEN_HEIGHT, SH110X_WHITE);
+        display.display();
+        delay(12);
+        // Erase to create scanning effect
+        display.clearDisplay();
+        display.drawRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, SH110X_WHITE);
+    }
+
+    // Title bounce
+    const char* title = "Sound Buffet";
+    for (int y = -16; y <= 18; y += 3) {
+        display.clearDisplay();
+        drawAnimatedBorder();
+        display.setTextSize(2);
+        int tw = strlen(title) * 12;
+        int tx = (SCREEN_WIDTH - tw) / 2;
+        display.setCursor(tx, y);
+        display.print(title);
+        display.display();
+        delay(20);
+    }
+
+    // Settle
+    display.setTextSize(1);
+    display.setCursor(18, 44);
+    display.print("Let\'s play");
+    display.display();
+    delay(300);
 }

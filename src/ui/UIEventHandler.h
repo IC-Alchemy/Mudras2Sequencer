@@ -9,6 +9,8 @@
 #include "../LEDMatrix/LEDMatrixFeedback.h"
 #include "ButtonManager.h"
 #include "UIState.h"
+#include "ButtonHandlers.h"
+#include "UIConstants.h"
 
 // Forward declarations to prevent circular dependencies
 class Sequencer;
@@ -17,24 +19,7 @@ class MidiNoteManager; // Forward declare MidiNoteManager
 // =======================
 //   CONSTANTS
 // =======================
-
-// Button indices for different functions
-constexpr uint8_t BUTTON_SLIDE_MODE = 22;
-constexpr uint8_t BUTTON_TOGGLE_DELAY = 23;
-constexpr uint8_t BUTTON_VOICE_SWITCH = 24;
-constexpr uint8_t BUTTON_AS5600_CONTROL = 25;
-constexpr uint8_t BUTTON_PLAY_STOP = 26;
-constexpr uint8_t BUTTON_CHANGE_SCALE = 27;
-constexpr uint8_t BUTTON_CHANGE_THEME = 28;
-constexpr uint8_t BUTTON_CHANGE_SWING_PATTERN = 29;
-constexpr uint8_t BUTTON_RANDOMIZE_SEQ1 = 30;
-constexpr uint8_t BUTTON_RANDOMIZE_SEQ2 = 31;
-constexpr uint8_t BUTTON_RANDOMIZE_SEQ3 = 32;
-constexpr uint8_t BUTTON_RANDOMIZE_SEQ4 = 33;
-
-constexpr uint8_t NUMBER_OF_STEP_BUTTONS = 16;
-constexpr unsigned long AS5600_DOUBLE_PRESS_WINDOW = 300; // ms
-constexpr unsigned long CONTROL_LED_FLASH_DURATION_MS = 250;
+// Moved to UIConstants.h to centralize button mappings, timing, and layout.
 
 // =======================
 //   FUNCTION DECLARATIONS

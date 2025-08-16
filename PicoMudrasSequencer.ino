@@ -3,6 +3,7 @@
 #include "src/dsp/dsp.h"
 #include "src/voice/Voice.h"
 #include "src/utils/Debug.h"
+#include "src/scales/scales.h"
 
 
 // =======================
@@ -387,7 +388,7 @@ void updateVoiceParameters(
         if (state.gate)
         {
             // Calculate MIDI note to match audio synthesis approach
-            uint8_t noteIndex = static_cast<uint8_t>(std::max(0.0f, std::min(state.note, 47.0f)));
+            uint8_t noteIndex = static_cast<uint8_t>(std::max(0.0f, std::min(state.note, static_cast<float>(SCALE_STEPS - 1))));
             int midiNote = scale[currentScale][noteIndex] + 36 + static_cast<int>(state.octave);
 
             // Always restart the gate timer for gated steps to ensure proper timing
@@ -487,7 +488,7 @@ void updateVoiceParametersForVoice(
 
     // Frequency updates only when gate HIGH (same policy)
     // Calculate base frequency for the voice
-    int noteIndex = state.note;
+    int noteIndex = std::max(0, std::min(static_cast<int>(state.note), static_cast<int>(SCALE_STEPS - 1)));
     float baseFreq = daisysp::mtof(scale[currentScale][noteIndex] + 36 + state.octave);
     voiceManager->setVoiceFrequency(voiceId, baseFreq);
     voiceManager->setVoiceSlide(voiceId, state.slide);
@@ -794,7 +795,6 @@ void setup1()
         Sequencer* seqs[] = { &seq1, &seq2, &seq3, &seq4 };
         matrixEventHandler(evt, uiState, seqs, 4, midiNoteManager);
     });
-    // Rising edge handler not needed - all events handled by main matrixEventHandler
 
     uClock.init();
     uClock.setOnSync24(onSync24Callback);
@@ -809,7 +809,6 @@ void setup1()
     seq1.start();
     seq2.start();
 
-    // Run gate-controlled functionality validation
 
     Serial.println("[CORE1] Setup complete!");
 }
@@ -827,17 +826,16 @@ void loop()
 
 }
 
-// --- Optimized LED and UI Update Loop (Core1) ---
+// --- LED, Display and UI Update Loop (Core1) ---
 void loop1()
 {
 
     usb_midi.read();
-    // Trigger immediate long-press resets for Randomize buttons
     pollUIHeldButtons(uiState, seq1, seq2);
 
     unsigned long currentMillis = millis();
 
-    // Check if any parameter buttons are held for prioritized sensor updates
+    // Check if any parameter buttons are held 
     bool parameterRecordingActive = isAnyParameterButtonHeld(uiState);
 
 
@@ -866,14 +864,7 @@ void loop1()
             GATE1 = false;
         }
 
-        // Safety mechanism: Force gate off if it's been active too long (more than 2 seconds worth of ticks)
-        if (GATE1 && gateTimer1.totalTicksProcessed > 960) // 960 ticks = 2 seconds at 480 PPQN, 90 BPM
-        {
-            GATE1 = false;
-            gateTimer1.stop();
-            // Force emergency note-off through MidiNoteManager
-            midiNoteManager.setGateState(0, false);
-        }
+      
 
         gateTimer2.tick();
         if (gateTimer2.isExpired() && GATE2)
@@ -881,14 +872,7 @@ void loop1()
             GATE2 = false;
         }
 
-        // Safety mechanism: Force gate off if it's been active too long (more than 2 seconds worth of ticks)
-        if (GATE2 && gateTimer2.totalTicksProcessed > 960) // 960 ticks = 2 seconds at 480 PPQN, 90 BPM
-        {
-            GATE2 = false;
-            gateTimer2.stop();
-            // Force emergency note-off through MidiNoteManager
-            midiNoteManager.setGateState(1, false);
-        }
+       
     }
 
 
@@ -899,19 +883,22 @@ void loop1()
     const unsigned long CONTROL_UPDATE_INTERVAL = 2; // 2ms interval
     uint16_t currtouched = touchSensor.touched();
 
+
+
+
+//  Button, LIDAR, and AS5600 polling occur here slowed way down to 1000 times per second.
 if ((currentMillis - lastControlUpdate >= CONTROL_UPDATE_INTERVAL)){
+
+    
     lastControlUpdate = currentMillis;
     Matrix_scan();
 
-        // Update AS5600 sensor and base values
+
     as5600Sensor.update();
     updateAS5600BaseValues(uiState);
 
-    // Apply AS5600 slide time control when in slide mode
 
-    // Update sensor once per loop iteration (avoid multiple calls)
     distanceSensor.update();
-    // Update global mm variable for backward compatibility
     int rawValue = distanceSensor.getRawValue();
     if (rawValue >= MIN_HEIGHT && rawValue <= MAX_HEIGHT)
     {
@@ -924,11 +911,13 @@ if ((currentMillis - lastControlUpdate >= CONTROL_UPDATE_INTERVAL)){
 
 
 }
+
+
     // Check for voice switch trigger and handle immediate OLED update
     if (uiState.voiceSwitchTriggered) {
         uiState.voiceSwitchTriggered = false;  // Clear the flag
         display.onVoiceSwitched(uiState, voiceManager.get());
-        Serial.println("Voice switch OLED update triggered");
+        //Serial.println("Voice switch OLED update triggered");
     }
 
     // Update LEDs only every 20ms

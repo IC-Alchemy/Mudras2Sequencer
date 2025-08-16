@@ -3,6 +3,7 @@
 #include "Arduino.h"
 #include <algorithm>
 #include <cmath>
+#include "../scales/scales.h" // Use centralized SCALES_COUNT / SCALE_STEPS
 
 // Constants
 static constexpr float FREQ_SLEW_RATE = 0.00035f; // Slide speed
@@ -213,7 +214,7 @@ particle_.SetDensity(dynamicDensity);
     {
       mixedOscillators *= oscillators[i].Process();
     }
-    mixedOscillators *= 2.f;
+    mixedOscillators *= 3.f;
   }
   else
   {
@@ -225,7 +226,7 @@ particle_.SetDensity(dynamicDensity);
 
   // Apply effects chain
   processEffectsChain(mixedOscillators);
-  mixedOscillators *= (.25f + (state.velocity));
+  mixedOscillators *= (.3f + (state.velocity));
   // Apply filter
   float filteredSignal = filter.Process(mixedOscillators);
 
@@ -253,7 +254,7 @@ particle_.SetDensity(dynamicDensity);
 
     // Calculate and set filter frequency
     filterFrequency =
-        daisysp::fmap(state.filter, 150.0f, 9710.0f, daisysp::Mapping::EXP);
+        daisysp::fmap(state.filter, 250.0f, 8400.0f, daisysp::Mapping::LINEAR);
 
     // Update oscillator frequencies
     updateOscillatorFrequencies();
@@ -366,25 +367,80 @@ particle_.SetDensity(dynamicDensity);
                                       int harmony)
   {
     // Clamp note to valid range with ARM-friendly integer operations
-    const int noteIndex = std::max(0, std::min(static_cast<int>(note), 47));
+    const int noteIndex = std::max(0, std::min(static_cast<int>(note), static_cast<int>(SCALE_STEPS - 1)));
 
-    // Apply harmony interval, ensuring we stay within scale bounds
-    const int harmonyNoteIndex = std::max(0, std::min(noteIndex + harmony, 47));
+    // Resolve target index by advancing across UNIQUE scale degrees (not raw indices)
+    // This fixes pentatonic and other scales with repeated entries in the SCALE_STEPS-step table.
+    auto advanceDegrees = [](const int* row, int startIdx, int degreeOffset) -> int {
+      int idx = startIdx;
+      if (degreeOffset == 0)
+        return idx;
+
+      if (degreeOffset > 0)
+      {
+        int remaining = degreeOffset;
+        int prev = row[idx];
+        while (remaining > 0 && idx < static_cast<int>(SCALE_STEPS - 1))
+        {
+          ++idx;
+          if (row[idx] != prev)
+          {
+            --remaining;
+            prev = row[idx];
+          }
+        }
+        return idx; // clamped at SCALE_STEPS-1 if we ran out
+      }
+      else // degreeOffset < 0
+      {
+        int remaining = -degreeOffset;
+        int prev = row[idx];
+        while (remaining > 0 && idx > 0)
+        {
+          --idx;
+          if (row[idx] != prev)
+          {
+            --remaining;
+            prev = row[idx];
+          }
+        }
+        return idx; // clamped at 0 if we ran out
+      }
+    };
+
+    int harmonyNoteIndex = noteIndex;
 
     // Resolve scale step to semitone offset using injected scale table if available
-    int scaleSemitone = harmonyNoteIndex; // chromatic fallback: 0..47 maps to 0..47
+    int scaleSemitone; // chromatic fallback will set this below
     if (scaleTable && scaleTableCount > 0 && currentScalePtr)
     {
       const uint8_t idx = *currentScalePtr;
       if (idx < scaleTableCount)
       {
-        scaleSemitone = scaleTable[idx][harmonyNoteIndex];
+        const int* row = scaleTable[idx];
+        // Advance by harmony degrees across UNIQUE semitone changes in the row
+        harmonyNoteIndex = advanceDegrees(row, noteIndex, harmony);
+        // Clamp defensively (advanceDegrees already clamps but keep safe)
+        harmonyNoteIndex = std::max(0, std::min(harmonyNoteIndex, static_cast<int>(SCALE_STEPS - 1)));
+        scaleSemitone = row[harmonyNoteIndex];
+      }
+      else
+      {
+        // Invalid scale index; fall back to chromatic
+        harmonyNoteIndex = std::max(0, std::min(noteIndex + harmony, static_cast<int>(SCALE_STEPS - 1)));
+        scaleSemitone = harmonyNoteIndex;
       }
     }
+    else
+    {
+      // No scale table injected; treat indices as chromatic steps
+      harmonyNoteIndex = std::max(0, std::min(noteIndex + harmony, static_cast<int>(SCALE_STEPS - 1)));
+      scaleSemitone = harmonyNoteIndex;
+    }
 
-    // Base MIDI mapping: center around 48 as before (C3-ish) then add octave offset in semitones
-    int midiNote = scaleSemitone + 48 + static_cast<int>(octaveOffset);
-    // Clamp to table range 0..127
+    // Base MIDI mapping: center around 36 as before (C2-ish) then add octave offset in semitones
+    int midiNote = scaleSemitone + 36 + static_cast<int>(octaveOffset);
+    // Clamp to MIDI range 0..127
     midiNote = std::max(0, std::min(midiNote, 127));
 
     // Fast lookup
@@ -453,21 +509,21 @@ particle_.SetDensity(dynamicDensity);
       config.oscWaveforms[0] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
       config.oscWaveforms[1] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
       config.oscWaveforms[2] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
-      config.oscAmplitudes[0] = .33f;
-      config.oscAmplitudes[1] = .33f;
-      config.oscAmplitudes[2] = .33f;
+      config.oscAmplitudes[0] = .4f;
+      config.oscAmplitudes[1] = .3f;
+      config.oscAmplitudes[2] = .3f;
       config.oscDetuning[0] = 0.0f;
-      config.oscDetuning[1] = 0.047;   // Slight detune
-      config.oscDetuning[2] = -0.044f; // Slight detune opposite`
+      config.oscDetuning[1] = 0.02;   // Slight detune
+      config.oscDetuning[2] = -0.02f; // Slight detune opposite`
       config.harmony[0] = 0;          // Root note
       config.harmony[1] = 0;          // Unison (no harmony)
       config.harmony[2] = 0;          // Unison (no harmony)
 
-      config.filterRes = 0.43f;
+      config.filterRes = 0.53f;
       config.filterDrive = 2.1f;
       config.filterMode = daisysp::LadderFilter::FilterMode::LP24;
-      config.filterPassbandGain = 0.23f;
-      config.highPassFreq = 140.0f;
+      config.filterPassbandGain = 0.33f;
+      config.highPassFreq = 110.0f;
 
       config.hasOverdrive = false;
       config.hasWavefolder = false;
@@ -478,8 +534,10 @@ particle_.SetDensity(dynamicDensity);
 
       config.defaultAttack = 0.04f;
       config.defaultDecay = 0.14f;
-      config.defaultSustain = 0.5f;
+      config.defaultSustain = 0.3f;
       config.defaultRelease = 0.1f;
+            config.outputLevel = 0.6f;    // Lower level for pad
+
       return config;
     }
 
@@ -487,25 +545,25 @@ particle_.SetDensity(dynamicDensity);
     {
       VoiceConfig config;
       config.oscillatorCount = 1;
-      config.oscWaveforms[0] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
+      config.oscWaveforms[0] = daisysp::Oscillator::WAVE_POLYBLEP_SQUARE;
 
-      config.oscAmplitudes[0] = 1.f;
-      config.oscAmplitudes[1] = 0.35f;
-      config.oscAmplitudes[2] = .36f;
+      config.oscAmplitudes[0] = .7f;
+    //  config.oscAmplitudes[1] = 0.35f;
+    //  config.oscAmplitudes[2] = .36f;
       config.oscPulseWidth[0] = 0.69f;
       config.oscDetuning[0] = 0.0f; // Fixed duplicate assignment
       config.oscDetuning[1] = 0.0f; // Fixed duplicate assignment
       config.oscDetuning[2] = 0.0f;
       config.harmony[0] = 0;  // Root note
-      config.harmony[1] = 11; // PERFECT 5TH
-      config.harmony[2] = 0; // Octave
-      config.filterRes = 0.42f;
-      config.filterDrive = 3.0f;
+      //config.harmony[1] = 11; // PERFECT 5TH
+     // config.harmony[2] = 0; // Octave
+      config.filterRes = 0.58f;
+      config.filterDrive = 2.0f;
       config.filterPassbandGain = 0.24f;
       config.highPassFreq = 170.0f;
       config.highPassRes = 0.5f;
       config.filterMode =
-          daisysp::LadderFilter::FilterMode::LP24; // Low-pass filter
+          daisysp::LadderFilter::FilterMode::LP36; // Low-pass filter
 
       config.hasOverdrive = false;
       config.hasWavefolder = false;
@@ -514,9 +572,9 @@ particle_.SetDensity(dynamicDensity);
       config.wavefolderGain = 1.0f;
       config.defaultAttack = 0.015f;
       config.defaultDecay = 0.1f;
-      config.defaultSustain = 0.5f;
+      config.defaultSustain = 0.3f;
       config.defaultRelease = 0.1f;
-
+      config.outputLevel = 0.5f;  
       return config;
     }
 
@@ -535,7 +593,7 @@ particle_.SetDensity(dynamicDensity);
       config.harmony[1] = 0; // Unison (bass typically monophonic)
       config.harmony[2] = 0; // Unison
       config.highPassRes = 0.45f;
-      config.filterRes = 0.33f;
+      config.filterRes = 0.43f;
       config.filterDrive = 2.9f;
       config.filterPassbandGain = 0.22f;
       config.highPassFreq = 75.0f; // Lower for bass
@@ -549,6 +607,7 @@ particle_.SetDensity(dynamicDensity);
       config.defaultDecay = 0.3f;
       config.defaultSustain = 0.5f;
       config.defaultRelease = 0.2f;
+      config.outputLevel = 0.6f;    // Lower level for pad
 
       return config;
     }
@@ -560,17 +619,17 @@ particle_.SetDensity(dynamicDensity);
       config.oscWaveforms[0] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
       config.oscWaveforms[1] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
       config.oscWaveforms[2] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
-      config.oscAmplitudes[0] = .35f;
-      config.oscAmplitudes[1] = .34f;
-      config.oscAmplitudes[2] = 0.34f;
+      config.oscAmplitudes[0] = .4f;
+      config.oscAmplitudes[1] = .2f;
+      config.oscAmplitudes[2] = 0.2f;
       config.oscDetuning[0] = 0.0f;
-      config.oscDetuning[1] = 0.02f;
-      config.oscDetuning[2] = -0.225f;
+      config.oscDetuning[1] = 0.072f;
+      config.oscDetuning[2] = -0.07f;
       config.harmony[0] = 0; // Root note
       config.harmony[1] = 0; // Unison (lead typically monophonic)
       config.harmony[2] = 0; // Unison
 
-      config.filterRes = 0.23f;
+      config.filterRes = 0.43f;
       config.filterDrive = 2.8f;
       config.filterPassbandGain = 0.33f;
       config.highPassFreq = 120.0f;
@@ -583,8 +642,9 @@ particle_.SetDensity(dynamicDensity);
 
       config.defaultAttack = 0.02f;
       config.defaultDecay = 0.2f;
-      config.defaultSustain = 0.2f;
+      config.defaultSustain = 0.3f;
       config.defaultRelease = 0.15f;
+      config.outputLevel = 0.6f;   
 
       return config;
     }
@@ -596,19 +656,19 @@ particle_.SetDensity(dynamicDensity);
       config.oscWaveforms[0] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
       config.oscWaveforms[1] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
       config.oscWaveforms[2] = daisysp::Oscillator::WAVE_POLYBLEP_SAW;
-      config.oscAmplitudes[0] = 0.33f;
-      config.oscAmplitudes[1] = 0.32f;
-      config.oscAmplitudes[2] = 0.32f;
+      config.oscAmplitudes[0] = 0.3f;
+      config.oscAmplitudes[1] = 0.3f;
+      config.oscAmplitudes[2] = 0.3f;
       config.harmony[0] = 0; // Root note
       config.harmony[1] = 4; // Perfect Fifth
       config.harmony[2] = 9; // Major Third One octave up
 
-      config.filterRes = 0.3f;
-      config.filterDrive = 2.8f;
+      config.filterRes = 0.1f;
+      config.filterDrive = 1.f;
       config.filterPassbandGain = 0.23f;
       config.highPassFreq = 160.0f;
       config.filterMode =
-          daisysp::LadderFilter::FilterMode::LP12; // Band-pass for percussive sound
+          daisysp::LadderFilter::FilterMode::LP24; // Band-pass for percussive sound
 
       config.hasOverdrive = false;
       config.hasWavefolder = false;
@@ -617,7 +677,7 @@ particle_.SetDensity(dynamicDensity);
       config.defaultDecay = 0.8f;
       config.defaultSustain = 0.5f;
       config.defaultRelease = .5f; // Long release
-      config.outputLevel = 1.f;    // Lower level for pad
+      config.outputLevel = 0.5f;    // Lower level for pad
       // config.outputLevel = 0.6f; // conLower level for pad
 
       return config;

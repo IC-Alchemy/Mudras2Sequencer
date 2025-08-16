@@ -63,7 +63,7 @@ public:
      * @param voiceManager Pointer to voice manager for accessing voice configs
      */
     void update(const UIState& uiState, const Sequencer& seq1, const Sequencer& seq2, const Sequencer& seq3, const Sequencer& seq4, class VoiceManager* voiceManager);
-    
+
     /**
      * @brief Clear the display
      */
@@ -157,6 +157,14 @@ private:
 private:
     class VoiceManager* voiceManagerRef = nullptr; // Reference to voice manager for immediate updates
 
+    // --- Visual Enhancements / Animation State ---
+    unsigned long lastAnimFrameMs = 0;
+    uint8_t borderAnimPhase = 0;
+
+    // --- Visual Enhancement Helpers ---
+    void drawAnimatedBorder();
+    void drawStepIndicators(const Sequencer& seq, int y);
+    void runStartupAnimation();
 };
 
 // External declaration for the global OLED display instance
