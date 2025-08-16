@@ -562,24 +562,6 @@ VoiceManager::ManagedVoice* VoiceManager::findVoice(uint8_t voiceId) {
 }
 
 /**
- * Private helper: const version of findVoice for read-only operations
- *
- * @param voiceId ID of voice to find
- * @return const ManagedVoice* Const pointer to found voice, or nullptr if not found
- *
- * Same as findVoice() but returns const pointer for const-correctness
- */
-const VoiceManager::ManagedVoice* VoiceManager::findVoice(uint8_t voiceId) const {
-    // OPTIMIZATION: Use direct iteration instead of std::find_if for better embedded performance
-    for (const auto& voice : voices) {
-        if (voice->id == voiceId) {
-            return voice.get();
-        }
-    }
-    return nullptr;
-}
-
-/**
  * Private helper: generates unique voice IDs
  *
  * @return uint8_t New unique voice ID (1-255)
