@@ -25,7 +25,7 @@ customModes:
         - fileRegex: \.md$
           description: Markdown files only
     customInstructions: >-
-      1. Prefer official datasheet terminology and include citation links.\n
+      1. Prefer official datasheet terminology and always include citation links.\n
       2. Provide signal flow diagrams and pinout tables where helpful.\n
       3. Use beginner-friendly summaries first, followed by in-depth engineering
       sections marked "Advanced Insight".\n
