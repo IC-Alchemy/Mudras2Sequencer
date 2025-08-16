@@ -10,7 +10,9 @@ build/
 
 # Local configuration
 .vscode/
+.roomodes
 .roo/rules/rules.md
+.trae/rules/project_rules.md
 .gitignore
 PROGRAMMERS_MANUAL.md
 .github/copilot-instructions.md
